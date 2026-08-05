@@ -1,0 +1,77 @@
+---
+title: "Tailwind CSS v4에서 다크 모드를 클래스로 다루기"
+date: "2026-06-18"
+summary: "v4의 기본 다크 모드는 미디어 쿼리다. next-themes와 함께 쓰려면 custom variant를 직접 선언해야 한다."
+---
+
+Tailwind CSS v4는 설정 파일 대신 CSS를 설정의 중심으로 옮겼다. 편해진 부분이 많지만, v3에서 `tailwind.config.js`에 한 줄 적어 해결했던 것들이 갈 곳을 잃기도 한다. 다크 모드가 대표적이다.
+
+## 무엇이 달라졌나
+
+v3에서는 클래스 기반 다크 모드를 이렇게 켰다.
+
+```js
+// tailwind.config.js
+module.exports = {
+  darkMode: "class",
+};
+```
+
+v4에는 이 파일이 없다. 그리고 `dark:` 유틸리티는 기본적으로 `prefers-color-scheme` 미디어 쿼리로 컴파일된다.
+
+```css
+@media (prefers-color-scheme: dark) {
+  .dark\:bg-zinc-950 {
+    background-color: var(--color-zinc-950);
+  }
+}
+```
+
+시스템 설정만 따라가면 충분한 사이트라면 이대로도 좋다. 문제는 수동 토글을 붙이는 순간이다. 미디어 쿼리는 자바스크립트로 뒤집을 수 없으니, `<html>`에 `class="dark"`를 붙여도 아무 일도 일어나지 않는다.
+
+## `@custom-variant`로 다시 선언하기
+
+v4는 배리언트를 CSS에서 정의하도록 열어뒀다. `dark`라는 이름을 그대로 덮어쓰면 된다.
+
+```css
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+```
+
+이렇게 하면 `dark:bg-zinc-950`은 미디어 쿼리 대신 아래처럼 컴파일된다.
+
+```css
+.dark\:bg-zinc-950:where(.dark, .dark *) {
+  background-color: var(--color-zinc-950);
+}
+```
+
+`:where()`로 감싼 이유는 명시도(specificity)다. `.dark .foo`는 클래스 두 개라 명시도가 `0,2,0`이 되고, 나중에 선언된 다른 유틸리티 하나로는 이 값을 덮어쓸 수 없다. `:where()`의 명시도는 항상 0이므로 `dark:` 유틸리티는 평범한 단일 클래스처럼 동작한다. 유틸리티 프레임워크에서는 이 성질이 중요하다.
+
+## 시스템 설정과 토글을 같이 쓰기
+
+나머지는 `next-themes`가 해준다.
+
+```tsx
+<ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+  {children}
+</ThemeProvider>
+```
+
+`defaultTheme="system"`이면 처음 방문한 사용자는 OS 설정을 따라가고, 토글을 한 번 누른 뒤부터는 그 선택이 `localStorage`에 남는다. 미디어 쿼리 하나로는 만들 수 없는 상태다.
+
+한 가지 남는 문제는 첫 페인트다. 서버는 사용자의 테마를 모르니 HTML에는 `dark` 클래스가 없고, 하이드레이션 직후에 붙는다. `next-themes`는 `<head>`에 동기 스크립트를 심어 이 간격을 없애지만, 그 대가로 서버와 클라이언트의 `<html>` 속성이 달라진다. React가 경고를 띄우므로 명시적으로 무시해준다.
+
+```tsx
+<html lang="ko" suppressHydrationWarning>
+```
+
+> `suppressHydrationWarning`은 해당 엘리먼트의 속성 불일치만 무시한다. 자식 트리로 전파되지 않으니 남용될 걱정은 적다.
+
+## 정리
+
+- v4의 `dark:`는 기본이 미디어 쿼리다
+- 클래스 전략이 필요하면 `@custom-variant dark (&:where(.dark, .dark *))`
+- `:where()`는 선택이 아니라 필수다 — 명시도 때문에
+- `<html>`에 `suppressHydrationWarning`을 잊지 말 것

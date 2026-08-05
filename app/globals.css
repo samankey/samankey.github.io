@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/* next-themes writes `class="dark"` on <html>, so drive the dark: variant off that
+   instead of Tailwind v4's default prefers-color-scheme media query. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background-color: var(--color-zinc-900);
+  color: var(--color-white);
+}
+
+.dark ::selection {
+  background-color: var(--color-zinc-100);
+  color: var(--color-zinc-900);
+}
+
+/* ---------------------------------------------------------------- *
+ * Post body                                                         *
+ * ---------------------------------------------------------------- */
+
+/* Inline code — anything that is not a token inside a highlighted block. */
+.post-body :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.3rem;
+  background-color: var(--color-zinc-100);
+  color: var(--color-zinc-800);
+}
+
+.dark .post-body :not(pre) > code {
+  background-color: var(--color-zinc-800);
+  color: var(--color-zinc-200);
+}
+
+/* ---------------------------------------------------------------- *
+ * Shiki                                                             *
+ *                                                                   *
+ * The rehype plugin runs with `defaultColor: false`, so every token  *
+ * carries both themes as CSS variables and we pick one here.         *
+ * ---------------------------------------------------------------- */
+
+.post-body pre.shiki {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  padding: 1rem 1.125rem;
+  margin: 1.75rem 0;
+  border: 1px solid var(--color-zinc-200);
+  tab-size: 2;
+  /* Keep the surface neutral zinc and let the theme colour only the tokens. */
+  background-color: var(--color-zinc-50);
+}
+
+.dark .post-body pre.shiki {
+  border-color: var(--color-zinc-800);
+  background-color: var(--color-zinc-900);
+}
+
+.post-body pre.shiki code {
+  display: block;
+  width: fit-content;
+  min-width: 100%;
+}
+
+.post-body pre.shiki .line {
+  display: inline-block;
+  width: 100%;
+}
+
+.post-body pre.shiki span {
+  color: var(--shiki-light);
+  background-color: transparent;
+}
+
+.dark .post-body pre.shiki span {
+  color: var(--shiki-dark);
+}

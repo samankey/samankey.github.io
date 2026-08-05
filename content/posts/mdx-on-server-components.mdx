@@ -1,0 +1,109 @@
+---
+title: "서버 컴포넌트에서 MDX를 렌더링하는 방법"
+date: "2025-11-02"
+summary: "파일 시스템에서 MDX를 읽어 RSC로 렌더링하고, 코드 블록은 빌드 타임에 Shiki로 하이라이팅한다."
+---
+
+App Router로 블로그를 만들 때 MDX를 다루는 방법은 크게 두 가지다. `@next/mdx`로 MDX 파일 자체를 라우트로 쓰거나, 콘텐츠를 데이터처럼 읽어서 런타임에 컴파일하는 것.
+
+전자는 설정이 간단하지만 파일 위치가 라우트 구조에 묶인다. 목록 페이지를 만들려면 결국 프론트매터를 따로 긁어와야 한다. 그래서 나는 후자를 택했다.
+
+## 콘텐츠를 데이터로 취급하기
+
+MDX 파일은 라우트 밖의 `content/posts/`에 두고, 서버에서 직접 읽는다.
+
+```ts
+import fs from "node:fs";
+import path from "node:path";
+import matter from "gray-matter";
+
+const POSTS_DIR = path.join(process.cwd(), "content", "posts");
+
+export function getAllPosts(): Post[] {
+  return fs
+    .readdirSync(POSTS_DIR)
+    .filter((file) => file.endsWith(".mdx"))
+    .map((file) => {
+      const raw = fs.readFileSync(path.join(POSTS_DIR, file), "utf8");
+      const { data, content } = matter(raw);
+
+      return {
+        slug: file.replace(/\.mdx$/, ""),
+        title: data.title as string,
+        date: data.date as string,
+        content,
+      };
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+```
+
+이게 그냥 함수라는 점이 좋다. 목록 페이지는 `getAllPosts()`를, 상세 페이지는 `getPost(slug)`를 부르면 된다. 정렬이든 연도별 그룹핑이든 태그 필터든 평범한 배열 조작이다.
+
+`generateStaticParams`까지 같은 함수로 채워지니 모든 포스트가 빌드 타임에 정적으로 만들어진다.
+
+```tsx
+export function generateStaticParams() {
+  return getAllPosts().map((post) => ({ slug: post.slug }));
+}
+```
+
+## next-mdx-remote/rsc
+
+읽어온 문자열을 렌더링하는 건 `next-mdx-remote`의 RSC 엔트리가 담당한다.
+
+```tsx
+import { MDXRemote } from "next-mdx-remote/rsc";
+
+export function Mdx({ source }: { source: string }) {
+  return <MDXRemote source={source} components={components} />;
+}
+```
+
+`serialize()`를 따로 부르고 결과를 클라이언트로 넘기던 예전 방식과 달리, 서버에서 컴파일하고 서버에서 렌더링한다. 직렬화 경계를 넘지 않으니 `components`에 서버 컴포넌트를 그대로 넣을 수 있다.
+
+날짜 포맷 하나 때문에 클라이언트 번들이 커지는 일이 없다는 뜻이다.
+
+## Shiki를 빌드 타임에 돌리기
+
+코드 하이라이팅은 rehype 플러그인으로 붙인다. 여기서 라이트/다크를 동시에 지원하는 요령이 하나 있다.
+
+```tsx
+import rehypeShiki from "@shikijs/rehype";
+
+const options = {
+  themes: { light: "github-light", dark: "github-dark" },
+  defaultColor: false,
+};
+```
+
+`defaultColor: false`가 핵심이다. 이 옵션이 없으면 Shiki는 라이트 테마 색을 인라인 `color`로 박고 다크 테마는 CSS 변수로만 넘긴다. `false`로 두면 어느 쪽도 기본값이 되지 않고, 토큰마다 두 테마가 모두 변수로 남는다.
+
+```html
+<span style="--shiki-light:#005cc5;--shiki-dark:#79b8ff">const</span>
+```
+
+어느 쪽을 쓸지는 CSS가 결정한다.
+
+```css
+.post-body pre.shiki span {
+  color: var(--shiki-light);
+}
+
+.dark .post-body pre.shiki span {
+  color: var(--shiki-dark);
+}
+```
+
+테마를 토글해도 재하이라이팅은 일어나지 않는다. 색상 변수만 바뀐다. 그리고 Shiki(그리고 그 안의 무거운 TextMate 그래머)는 빌드 타임에만 실행되므로 클라이언트 번들에는 아무것도 실려나가지 않는다.
+
+## 트레이드오프
+
+| | `@next/mdx` | `next-mdx-remote/rsc` |
+| --- | --- | --- |
+| 설정 | 거의 없음 | 로더 함수를 직접 작성 |
+| 콘텐츠 위치 | `app/` 안 | 자유 |
+| 목록·정렬·필터 | 별도 처리 필요 | 그냥 배열 |
+| 외부 콘텐츠(CMS 등) | 어려움 | 문자열이면 됨 |
+
+포스트가 열 개쯤인 개인 블로그라면 사실 어느 쪽이든 잘 돌아간다. 다만 목록 페이지를 만드는 순간부터 "콘텐츠를 데이터로 보는" 쪽이 계속 편해진다.
