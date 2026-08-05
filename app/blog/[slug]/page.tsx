@@ -16,9 +16,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!post) return {};
 
+  const url = `/blog/${post.slug}`;
+
   return {
     title: post.title,
     description: post.summary,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      url,
+      title: post.title,
+      description: post.summary,
+      publishedTime: post.date,
+    },
   };
 }
 

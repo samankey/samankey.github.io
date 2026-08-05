@@ -4,13 +4,25 @@
    instead of Tailwind v4's default prefers-color-scheme media query. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Geist carries no Hangul, so Pretendard sits directly behind it. CSS font
+   fallback is per-character: Latin resolves in Geist, and only the codepoints
+   Geist lacks fall through to Pretendard. */
+/* Plain `@theme`, not `@theme inline`: `inline` substitutes the value into
+   utilities without emitting the custom property, which would leave
+   `var(--font-sans)` undefined in the hand-written rules below. */
+@theme {
+  --font-sans: var(--font-geist-sans), var(--font-pretendard), sans-serif;
+  --font-mono: var(--font-geist-mono), var(--font-pretendard), monospace;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Keeps native UI — scrollbars, form controls, caret — in the right theme. */
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
@@ -31,6 +43,11 @@ body {
 /* ---------------------------------------------------------------- *
  * Post body                                                         *
  * ---------------------------------------------------------------- */
+
+/* Leave room for the sticky-free header when jumping to a #heading. */
+.post-body :is(h2, h3) {
+  scroll-margin-top: 3rem;
+}
 
 /* Inline code — anything that is not a token inside a highlighted block. */
 .post-body :not(pre) > code {

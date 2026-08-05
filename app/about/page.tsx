@@ -5,6 +5,8 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "About",
   description: `${site.name} 소개`,
+  alternates: { canonical: "/about" },
+  openGraph: { url: "/about", title: `About — ${site.name}` },
 };
 
 /* ------------------------------------------------------------------ *

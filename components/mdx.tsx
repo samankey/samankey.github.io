@@ -2,7 +2,18 @@ import Link from "next/link";
 import type { ComponentPropsWithoutRef } from "react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypeShiki from "@shikijs/rehype";
+import rehypeSlug from "rehype-slug";
+import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import remarkGfm from "remark-gfm";
+
+/** Marks the anchor that rehype-autolink-headings appends to each heading. */
+const HEADING_ANCHOR_CLASS = "heading-anchor";
+
+const autolinkOptions = {
+  behavior: "append",
+  properties: { className: [HEADING_ANCHOR_CLASS], "aria-label": "이 섹션 링크" },
+  content: { type: "text", value: "#" },
+} as const;
 
 /**
  * `defaultColor: false` makes Shiki emit both themes as CSS variables
@@ -17,7 +28,19 @@ const shikiOptions = {
   defaultColor: false,
 } as const;
 
-function Anchor({ href = "", ...props }: ComponentPropsWithoutRef<"a">) {
+function Anchor({ href = "", className: incoming, ...props }: ComponentPropsWithoutRef<"a">) {
+  // The autolinked heading anchor is decoration, not prose — it opts out of the
+  // underline treatment and only surfaces when its heading is hovered.
+  if (incoming?.includes(HEADING_ANCHOR_CLASS)) {
+    return (
+      <a
+        href={href}
+        className="absolute top-0 -left-5 font-mono text-zinc-300 no-underline opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-visible:opacity-100 dark:text-zinc-600"
+        {...props}
+      />
+    );
+  }
+
   const className =
     "underline decoration-zinc-300 decoration-1 underline-offset-[3px] transition-colors duration-200 hover:decoration-zinc-900 dark:decoration-zinc-600 dark:hover:decoration-zinc-100";
 
@@ -40,13 +63,13 @@ const components = {
   a: Anchor,
   h2: (props: ComponentPropsWithoutRef<"h2">) => (
     <h2
-      className="mt-12 mb-4 text-[17px] font-medium tracking-tight text-zinc-900 dark:text-zinc-100"
+      className="group relative mt-12 mb-4 text-[17px] font-medium tracking-tight text-zinc-900 dark:text-zinc-100"
       {...props}
     />
   ),
   h3: (props: ComponentPropsWithoutRef<"h3">) => (
     <h3
-      className="mt-10 mb-3 text-[15px] font-medium text-zinc-900 dark:text-zinc-100"
+      className="group relative mt-10 mb-3 text-[15px] font-medium text-zinc-900 dark:text-zinc-100"
       {...props}
     />
   ),
@@ -93,7 +116,11 @@ export function Mdx({ source }: { source: string }) {
       options={{
         mdxOptions: {
           remarkPlugins: [remarkGfm],
-          rehypePlugins: [[rehypeShiki, shikiOptions]],
+          rehypePlugins: [
+            rehypeSlug,
+            [rehypeAutolinkHeadings, autolinkOptions],
+            [rehypeShiki, shikiOptions],
+          ],
         },
       }}
     />

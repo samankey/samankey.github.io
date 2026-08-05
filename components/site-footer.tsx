@@ -19,6 +19,12 @@ export function SiteFooter() {
         >
           email
         </a>
+        <a
+          href="/feed.xml"
+          className="transition-colors duration-200 hover:text-zinc-900 dark:hover:text-zinc-100"
+        >
+          rss
+        </a>
       </div>
     </footer>
   );
