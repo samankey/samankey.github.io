@@ -24,11 +24,24 @@ const frontmatterSchema = z.object({
   draft: z.boolean().default(false),
 });
 
-export type PostMeta = z.infer<typeof frontmatterSchema> & { slug: string };
+/**
+ * An optional `YYYY-MM-DD-` prefix keeps content/posts sorted chronologically in
+ * any file listing. It is stripped from the slug so the date never reaches the
+ * URL — otherwise a post could not be redated without breaking its permalink.
+ */
+const DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})-/;
+
+export type PostMeta = z.infer<typeof frontmatterSchema> & {
+  slug: string;
+  /** Kept so diagnostics can name the real file rather than rebuild its name. */
+  fileName: string;
+};
 export type Post = PostMeta & { content: string };
 
 function readPostFile(fileName: string): Post {
-  const slug = fileName.replace(/\.mdx?$/, "");
+  const base = fileName.replace(/\.mdx?$/, "");
+  const prefix = base.match(DATE_PREFIX)?.[1];
+  const slug = base.replace(DATE_PREFIX, "");
   const raw = fs.readFileSync(path.join(POSTS_DIR, fileName), "utf8");
   const { data, content } = matter(raw);
 
@@ -41,16 +54,58 @@ function readPostFile(fileName: string): Post {
     throw new Error(`content/posts/${fileName} 의 프론트매터가 올바르지 않습니다:\n${issues}`);
   }
 
-  return { slug, ...parsed.data, content };
+  if (slug === "") {
+    throw new Error(
+      `content/posts/${fileName} 은 날짜 접두사만 있고 slug가 없습니다. ${prefix}-제목.mdx 형태로 바꾸세요.`,
+    );
+  }
+
+  // The prefix is only a label, so frontmatter stays the single source of truth —
+  // but a label that contradicts it would go unnoticed, since the filename shows
+  // up only in a file listing and the frontmatter date is what the site renders.
+  if (prefix && prefix !== parsed.data.date) {
+    throw new Error(
+      `content/posts/${fileName} 의 파일명 날짜(${prefix})가 frontmatter date(${parsed.data.date})와 다릅니다.\n` +
+        `  · 파일명을 ${parsed.data.date}-${slug}.mdx 로 바꾸거나, frontmatter를 고치세요.`,
+    );
+  }
+
+  return { slug, fileName, ...parsed.data, content };
+}
+
+/**
+ * Stripping the date prefix means two files dated differently can collapse onto
+ * one slug, which would silently leave one of them unreachable.
+ */
+function assertUniqueSlugs(posts: Post[]): void {
+  const seen = new Map<string, string>();
+
+  for (const post of posts) {
+    const previous = seen.get(post.slug);
+
+    if (previous) {
+      throw new Error(
+        `slug \`${post.slug}\` 가 중복됩니다: content/posts/${previous} 와 content/posts/${post.fileName}`,
+      );
+    }
+
+    seen.set(post.slug, post.fileName);
+  }
 }
 
 function loadPosts(): Post[] {
   if (!fs.existsSync(POSTS_DIR)) return [];
 
-  const posts = fs
+  const all = fs
     .readdirSync(POSTS_DIR)
     .filter((file) => /\.mdx?$/.test(file))
-    .map(readPostFile)
+    .map(readPostFile);
+
+  // Checked across every file, drafts included: a draft colliding with a
+  // published post is a mistake worth surfacing before the draft goes live.
+  assertUniqueSlugs(all);
+
+  const posts = all
     .filter((post) => !post.draft || !isProduction)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
@@ -146,7 +201,7 @@ export function getUsedCodeLanguages(known: (lang: string) => boolean): string[]
 
       if (!known(id)) {
         throw new Error(
-          `content/posts/${post.slug}.mdx 에서 Shiki가 모르는 코드 언어 \`${id}\` 를 사용했습니다.`,
+          `content/posts/${post.fileName} 에서 Shiki가 모르는 코드 언어 \`${id}\` 를 사용했습니다.`,
         );
       }
 
@@ -200,7 +255,7 @@ function reportBrokenLinks(posts: Post[]): void {
     for (const href of extractInternalLinks(post.content)) {
       const normalized = href.length > 1 ? href.replace(/\/$/, "") : href;
       if (!routes.has(normalized) && !routes.has(decodeURIComponent(normalized))) {
-        broken.push(`content/posts/${post.slug}.mdx → ${href}`);
+        broken.push(`content/posts/${post.fileName} → ${href}`);
       }
     }
   }
