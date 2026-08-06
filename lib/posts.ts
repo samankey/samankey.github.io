@@ -109,6 +109,19 @@ export function getPostsByTag(tag: string): Post[] {
   return getAllPosts().filter((post) => post.tags.includes(tag));
 }
 
+/** Neighbours in reading order. Posts are sorted newest first, so older is +1. */
+export function getAdjacentPosts(slug: string): { older: Post | null; newer: Post | null } {
+  const posts = getAllPosts();
+  const index = posts.findIndex((post) => post.slug === slug);
+
+  if (index === -1) return { older: null, newer: null };
+
+  return {
+    older: posts[index + 1] ?? null,
+    newer: posts[index - 1] ?? null,
+  };
+}
+
 /** `2026-06-18` → `2026.06.18` — formatted from the string so it is timezone-proof. */
 export function formatDate(date: string): string {
   return date.slice(0, 10).replaceAll("-", ".");

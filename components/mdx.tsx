@@ -3,9 +3,15 @@ import type { ComponentPropsWithoutRef } from "react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypeShikiFromHighlighter from "@shikijs/rehype/core";
 import { bundledLanguages, createHighlighter, type Highlighter } from "shiki";
+import {
+  transformerMetaHighlight,
+  transformerNotationHighlight,
+} from "@shikijs/transformers";
+import type { ShikiTransformer } from "shiki";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import remarkGfm from "remark-gfm";
+import { CodeBlock } from "@/components/code-block";
 import { getUsedCodeLanguages } from "@/lib/posts";
 
 /** Marks the anchor that rehype-autolink-headings appends to each heading. */
@@ -22,12 +28,35 @@ const autolinkOptions = {
  * (`--shiki-light` / `--shiki-dark`) instead of baking one in; globals.css
  * decides which one applies.
  */
+/**
+ * Shiki has no built-in notion of a filename, so lift it off the fence meta
+ * (```ts filename=lib/posts.ts) onto the `pre` for CodeBlock to render.
+ */
+function transformerFilename(): ShikiTransformer {
+  return {
+    name: "filename",
+    pre(node) {
+      const raw = this.options.meta?.__raw ?? "";
+      const match = raw.match(/(?:^|\s)filename=(?:"([^"]+)"|'([^']+)'|(\S+))/);
+      const filename = match?.[1] ?? match?.[2] ?? match?.[3];
+
+      if (filename) node.properties["data-filename"] = filename;
+    },
+  };
+}
+
 const shikiOptions = {
   themes: {
     light: "github-light",
     dark: "github-dark",
   },
   defaultColor: false,
+  transformers: [
+    transformerFilename(),
+    // `// [!code highlight]` on a line, and ```ts {2,5-7} on the fence.
+    transformerNotationHighlight({ matchAlgorithm: "v3" }),
+    transformerMetaHighlight(),
+  ],
 } as const;
 
 /**
@@ -82,6 +111,7 @@ function Anchor({ href = "", className: incoming, ...props }: ComponentPropsWith
 
 const components = {
   a: Anchor,
+  pre: CodeBlock,
   h2: (props: ComponentPropsWithoutRef<"h2">) => (
     <h2
       className="group relative mt-12 mb-4 text-[17px] font-medium tracking-tight text-zinc-900 dark:text-zinc-100"

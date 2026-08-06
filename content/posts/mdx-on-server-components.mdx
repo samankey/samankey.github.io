@@ -13,7 +13,7 @@ App Router로 블로그를 만들 때 MDX를 다루는 방법은 크게 두 가�
 
 MDX 파일은 라우트 밖의 `content/posts/`에 두고, 서버에서 직접 읽는다.
 
-```ts
+```ts filename=lib/posts.ts
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
@@ -53,7 +53,7 @@ export function generateStaticParams() {
 
 읽어온 문자열을 렌더링하는 건 `next-mdx-remote`의 RSC 엔트리가 담당한다.
 
-```tsx
+```tsx filename=components/mdx.tsx
 import { MDXRemote } from "next-mdx-remote/rsc";
 
 export function Mdx({ source }: { source: string }) {
@@ -74,7 +74,7 @@ import rehypeShiki from "@shikijs/rehype";
 
 const options = {
   themes: { light: "github-light", dark: "github-dark" },
-  defaultColor: false,
+  defaultColor: false, // [!code highlight]
 };
 ```
 
@@ -86,7 +86,7 @@ const options = {
 
 어느 쪽을 쓸지는 CSS가 결정한다.
 
-```css
+```css filename=app/globals.css
 .post-body pre.shiki span {
   color: var(--shiki-light);
 }

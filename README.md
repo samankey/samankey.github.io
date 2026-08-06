@@ -38,7 +38,9 @@ app/
   fonts/                        Pretendard 서브셋 + OFL 라이선스
 components/
   mdx.tsx               MDXRemote + Shiki/slug/autolink 설정, MDX 엘리먼트 매핑
+  code-block.tsx        코드 블록 프레임 + 복사 버튼 (클라이언트)
   post-list.tsx         연도별 목록
+  post-nav.tsx          이전 / 다음 글
   tag-list.tsx          포스트 하단 태그
   site-header.tsx / site-footer.tsx
   theme-provider.tsx / theme-toggle.tsx
@@ -122,6 +124,8 @@ pnpm remove pretendard
 
 Pretendard는 OFL-1.1입니다 — `app/fonts/Pretendard-LICENSE.txt`.
 
+제목과 목록 항목에는 `word-break: keep-all`을 적용했습니다. 기본값으로 두면 한국어가 어절 중간에서 끊겨 `MDX` / `를 렌더링하는` 처럼 조사만 다음 줄로 넘어갑니다.
+
 ## OG 이미지
 
 `next/og`(Satori)로 빌드 타임에 생성합니다. Satori는 woff2를 파싱하지 못하고 내장 폰트는 라틴만 커버하므로, 한글 제목이 빈 박스로 나오지 않도록 woff 서브셋을 명시적으로 넘깁니다 — 이 파일은 클라이언트 번들에 포함되지 않습니다.
@@ -146,6 +150,27 @@ Pretendard는 OFL-1.1입니다 — `app/fonts/Pretendard-LICENSE.txt`.
 | 사용하는 언어만 | 11개 | ~31ms | ~78MB |
 
 언어 목록은 포스트의 코드 펜스를 스캔해 자동으로 구성되므로 따로 관리할 필요가 없습니다. Shiki가 모르는 언어를 쓰면 파일명과 함께 빌드가 실패합니다.
+
+### 파일명과 라인 강조
+
+````
+```ts filename=lib/posts.ts {3}
+// {3} 은 3번째 줄을 강조
+const x = 1              // [!code highlight] 도 같은 효과
+```
+````
+
+파일명은 Shiki 기본 기능이 아니라 펜스 meta를 읽어 `pre`에 `data-filename`으로 붙이는 작은 transformer를 [`components/mdx.tsx`](components/mdx.tsx)에 직접 두었습니다.
+
+diff transformer(`[!code ++]`)는 넣지 않았습니다. 관례적인 초록/빨강이 "포인트 컬러 없음" 규칙과 부딪히고, 흑백으로 표현하면 diff의 가독성이 오히려 떨어집니다.
+
+### 복사 버튼
+
+`pre`를 [`components/code-block.tsx`](components/code-block.tsx)의 클라이언트 컴포넌트로 매핑해 `figure` 안에 감쌉니다. Shiki가 `pre`에 실어 보내는 테마 클래스와 토큰별 CSS 변수(`style`)를 그대로 통과시켜야 하므로 props를 전부 spread합니다.
+
+블록 hover 시 우상단에 나타나고, 클립보드 쓰기가 실패하면(비보안 컨텍스트 등) 성공 표시를 하지 않고 조용히 넘어갑니다. 이 사이트의 유일한 클라이언트 JS이며 `/blog/[slug]` 라우트에만 694 B 붙습니다.
+
+블록 프레임(테두리·라운드·배경)은 `pre`가 아니라 `figure`에 있습니다. 파일명 바가 테두리 안쪽에 들어가야 하기 때문입니다. 그리고 `pre`의 좌우 패딩을 각 `.line`으로 옮겼습니다 — 그래야 강조된 줄의 배경이 블록 끝까지 닿습니다.
 
 ## 피드
 

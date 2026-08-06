@@ -36,7 +36,7 @@ export function PostList({
                     {formatDate(post.date)}
                   </time>
 
-                  <span className="text-[15px] text-zinc-700 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-zinc-950 dark:text-zinc-300 dark:group-hover:text-zinc-50">
+                  <span className="text-[15px] break-keep text-zinc-700 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-zinc-950 dark:text-zinc-300 dark:group-hover:text-zinc-50">
                     {post.title}
                   </span>
                 </Link>

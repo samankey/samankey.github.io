@@ -71,23 +71,51 @@ body {
  * carries both themes as CSS variables and we pick one here.         *
  * ---------------------------------------------------------------- */
 
+/* The frame lives on the figure so the filename bar sits inside the border and
+   shares the rounded corners. */
+.post-body figure.code-block {
+  position: relative;
+  margin: 1.75rem 0;
+  border: 1px solid var(--color-zinc-200);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  /* Keep the surface neutral zinc and let the theme colour only the tokens. */
+  background-color: var(--color-zinc-50);
+}
+
+.dark .post-body figure.code-block {
+  border-color: var(--color-zinc-800);
+  background-color: var(--color-zinc-900);
+}
+
+.post-body figure.code-block figcaption {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-zinc-500);
+  padding: 0.5rem 1.125rem;
+  /* Leave room for the copy button. */
+  padding-right: 4.5rem;
+  border-bottom: 1px solid var(--color-zinc-200);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dark .post-body figure.code-block figcaption {
+  border-bottom-color: var(--color-zinc-800);
+  color: var(--color-zinc-400);
+}
+
 .post-body pre.shiki {
   font-family: var(--font-mono);
   font-size: 0.8125rem;
   line-height: 1.7;
   overflow-x: auto;
-  border-radius: 0.5rem;
-  padding: 1rem 1.125rem;
-  margin: 1.75rem 0;
-  border: 1px solid var(--color-zinc-200);
+  /* Horizontal padding belongs to the lines, so a highlighted line's
+     background reaches the edges of the block instead of stopping short. */
+  padding: 1rem 0;
   tab-size: 2;
-  /* Keep the surface neutral zinc and let the theme colour only the tokens. */
-  background-color: var(--color-zinc-50);
-}
-
-.dark .post-body pre.shiki {
-  border-color: var(--color-zinc-800);
-  background-color: var(--color-zinc-900);
+  background-color: transparent;
 }
 
 .post-body pre.shiki code {
@@ -99,6 +127,17 @@ body {
 .post-body pre.shiki .line {
   display: inline-block;
   width: 100%;
+  padding-inline: 1.125rem;
+}
+
+.post-body pre.shiki .line.highlighted {
+  background-color: var(--color-zinc-200);
+  box-shadow: inset 2px 0 0 var(--color-zinc-400);
+}
+
+.dark .post-body pre.shiki .line.highlighted {
+  background-color: var(--color-zinc-800);
+  box-shadow: inset 2px 0 0 var(--color-zinc-600);
 }
 
 .post-body pre.shiki span {

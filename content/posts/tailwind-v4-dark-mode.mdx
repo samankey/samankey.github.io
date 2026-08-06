@@ -11,7 +11,7 @@ Tailwind CSS v4는 설정 파일 대신 CSS를 설정의 중심으로 옮겼다.
 
 v3에서는 클래스 기반 다크 모드를 이렇게 켰다.
 
-```js
+```js filename=tailwind.config.js
 // tailwind.config.js
 module.exports = {
   darkMode: "class",
@@ -34,7 +34,7 @@ v4에는 이 파일이 없다. 그리고 `dark:` 유틸리티는 기본적으로
 
 v4는 배리언트를 CSS에서 정의하도록 열어뒀다. `dark`라는 이름을 그대로 덮어쓰면 된다.
 
-```css
+```css filename=app/globals.css {3}
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -54,7 +54,7 @@ v4는 배리언트를 CSS에서 정의하도록 열어뒀다. `dark`라는 이�
 
 나머지는 `next-themes`가 해준다.
 
-```tsx
+```tsx filename=app/layout.tsx
 <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
   {children}
 </ThemeProvider>
