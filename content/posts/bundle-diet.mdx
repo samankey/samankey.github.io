@@ -1,0 +1,92 @@
+---
+title: "Bundle diet"
+date: "2022-04-10"
+summary: "번들 크기를 줄이는 네 갈래 — 재기, 중복 제거, 트리 셰이킹, 그리고 무거운 의존성 미루기."
+tags: ["bundling", "webpack", "performance"]
+---
+
+이 글은 토스 개발자 컨퍼런스 SLASH 21의 [Bundle diet](https://www.youtube.com/watch?v=EP7g5R-7zwM&list=PL1DJtS1Hv1PiGXmgruP1_gM2TSvQiOsFL&index=20)(이한) 발표를 요약한 것이다.
+
+## 먼저 재기
+
+줄이려면 먼저 무엇이 자리를 차지하는지 알아야 한다.
+
+```bash
+npx nuxt build --analyze
+```
+
+번들을 트리맵으로 그려주므로 어떤 모듈이 큰지, 같은 라이브러리가 여러 번 들어갔는지가 한눈에 보인다. Nuxt가 아니라면 `webpack-bundle-analyzer`가 같은 역할을 한다.
+
+## 라이브러리 중복 줄이기
+
+npm은 의존성들이 semver를 지킨다고 **가정하고** 호환되는 버전을 하나로 합친다. 문제는 이 가정이 항상 맞지는 않는다는 점이다. 그래서 같은 라이브러리의 여러 버전이 번들에 함께 실려 있는 경우가 생긴다.
+
+설치 단계에서 중복을 걷어내는 명령이 있다.
+
+```bash
+npm dedupe
+```
+
+Yarn 1에서는 `yarn-deduplicate`를, Yarn 2 이상에서는 내장된 `yarn dedupe`를 쓴다.
+
+### 필요한 것만 가져오기
+
+중복 못지않게 큰 문제는 하나만 쓰면서 전부 가져오는 것이다.
+
+```js
+import { debounce } from "lodash";
+```
+
+`babel-plugin-lodash`는 이 임포트를 실제 쓰는 모듈 경로로 바꿔준다.
+
+```json filename=.babelrc
+{
+  "plugins": ["lodash"]
+}
+```
+
+lodash 외의 라이브러리는 `babel-plugin-transform-imports`로 같은 변환을 규칙으로 직접 정의할 수 있다.
+
+라이브러리가 node와 브라우저 환경에 서로 다른 빌드를 제공하는 경우, 환경을 통일하기 위해 polyfill을 추가해야 할 수 있다.
+
+### 설치 전에 재보기
+
+[bundlephobia](https://bundlephobia.com)에 패키지 이름을 넣으면 설치하기 전에 용량, 다운로드 시간, 의존성을 확인할 수 있다. 대안이 여러 개일 때 고르는 기준이 된다.
+
+## 트리 셰이킹
+
+정적 분석으로 실제로 쓰이는 코드만 남기는 기술이다. ESM의 `import`/`export`가 정적이라 가능하다.
+
+여기서 역할이 나뉘는데, 안 쓰이는 export를 표시하는 건 번들러이고 실제로 지우는 건 `terser` 같은 압축 도구다.
+
+다만 번들러가 지워도 되는지 판단하려면 그 코드에 부수 효과가 없다는 걸 알아야 한다. 그 표시가 `/*#__PURE__*/` 주석이다.
+
+```js
+var Foo = /*#__PURE__*/ createComponent();
+```
+
+TypeScript 컴파일러는 이 주석을 붙여주지 않는다. 트리 셰이킹이 중요하다면 babel로 컴파일하는 편이 낫다.
+
+## 무거운 라이브러리 영향 줄이기
+
+지울 수 없는 무거운 의존성은 초기 번들에서 떼어내 필요한 시점으로 미룬다.
+
+```ts
+const { default: Chart } = await import("chart.js");
+```
+
+webpack의 매직 코멘트를 쓰면 브라우저가 한가한 시점에 미리 받아둘 수도 있다.
+
+```ts
+import(/* webpackPrefetch: true */ "./heavy-modal");
+```
+
+`webpackPrefetch`는 브라우저가 여유로울 때 내려받고, `webpackPreload`는 부모 청크와 함께 병렬로 받는다. 당장 필요한 게 아니라면 prefetch가 맞다.
+
+## 정리
+
+- 재는 것부터 — `--analyze`
+- 중복은 `npm dedupe` / `yarn dedupe`
+- 전체 대신 필요한 것만 — `babel-plugin-lodash`, `babel-plugin-transform-imports`
+- 트리 셰이킹이 걸려 있으면 tsc보다 babel
+- 못 줄이는 건 `import()`로 미루기
