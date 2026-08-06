@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getAllPosts } from "@/lib/posts";
+import { getAllPosts, getAllTags, getPostsByTag } from "@/lib/posts";
 import { site } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -22,6 +22,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: post.date,
       changeFrequency: "yearly" as const,
       priority: 0.8,
+    })),
+    ...getAllTags().map(({ tag }) => ({
+      url: `${site.url}/blog/tag/${encodeURIComponent(tag)}`,
+      lastModified: getPostsByTag(tag)[0]?.date,
+      changeFrequency: "monthly" as const,
+      priority: 0.3,
     })),
   ];
 }

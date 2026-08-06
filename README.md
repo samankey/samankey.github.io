@@ -28,6 +28,7 @@ app/
   about/page.tsx                About — 내용을 이 파일에서 직접 수정
   blog/[slug]/page.tsx          포스트 상세 (SSG)
   blog/[slug]/opengraph-image.tsx  포스트별 OG 이미지
+  blog/tag/[tag]/page.tsx       태그별 목록
   opengraph-image.tsx           사이트 기본 OG 이미지
   feed.xml/route.ts             RSS 2.0
   sitemap.ts / robots.ts
@@ -38,10 +39,11 @@ app/
 components/
   mdx.tsx               MDXRemote + Shiki/slug/autolink 설정, MDX 엘리먼트 매핑
   post-list.tsx         연도별 목록
+  tag-list.tsx          포스트 하단 태그
   site-header.tsx / site-footer.tsx
   theme-provider.tsx / theme-toggle.tsx
 lib/
-  posts.ts              content/posts 로더
+  posts.ts              content/posts 로더 — 검증, 태그, 링크 검사
   site.ts               이름·이메일·링크 등 사이트 메타
   og.tsx                OG 카드 렌더러 (Satori)
 content/posts/
@@ -57,12 +59,28 @@ content/posts/
 title: "제목"
 date: "2026-08-05"
 summary: "메타 설명에 쓰이는 한 줄 요약 (선택)"
+tags: ["next.js", "mdx"]
+draft: false
 ---
 
 본문…
 ```
 
 `date`는 `YYYY-MM-DD`. 목록에서는 `YYYY.MM.DD`로 표시되고, 문자열 그대로 잘라 쓰기 때문에 타임존 영향을 받지 않습니다. 정렬과 연도 그룹핑도 이 값을 기준으로 자동 처리됩니다.
+
+프론트매터는 zod로 검증합니다([`lib/posts.ts`](lib/posts.ts)). 형식이 틀리면 파일명과 필드를 짚어 즉시 실패합니다 — 정규식만으로는 통과하는 `2026-02-31` 같은 날짜도 실제 달력 날짜인지 확인합니다.
+
+`draft: true`인 글은 개발 서버에서는 보이고 프로덕션 빌드에서는 제외됩니다. 해당 글에만 붙어 있던 태그의 태그 페이지도 함께 사라집니다.
+
+## 태그
+
+`tags`를 적으면 `/blog/tag/<태그>` 페이지가 자동으로 생기고 sitemap에도 포함됩니다. 태그는 문자열 그대로 매칭하며 URL에서만 인코딩되므로, 공백이 섞인 태그도 동작하지만 URL이 지저분해집니다 — 소문자 한 단어를 권합니다.
+
+## 내부 링크 검사
+
+본문의 `/blog/...`, `/about` 링크가 실제로 존재하는지 포스트를 읽을 때마다 확인합니다. 코드 블록과 인라인 코드는 먼저 제거하므로 코드 안의 마크다운 링크 문법은 오탐하지 않습니다.
+
+개발 중에는 경고만 출력합니다(대상 글을 만들기 전에 링크를 먼저 쓸 수 있도록). 프로덕션 빌드에서는 예외를 던져 빌드를 세웁니다.
 
 ## 다크 모드
 
@@ -120,6 +138,15 @@ Pretendard는 OFL-1.1입니다 — `app/fonts/Pretendard-LICENSE.txt`.
 
 테마를 바꾸려면 [`components/mdx.tsx`](components/mdx.tsx)의 `shikiOptions`를 수정하세요.
 
+하이라이터는 직접 만들어 rehype 플러그인에 넘깁니다. `@shikijs/rehype`는 이미 `getSingletonHighlighter`로 프로세스 전역에서 하나를 공유하므로 재생성이 문제는 아닙니다 — 문제는 `options.langs || Object.keys(bundledLanguages)`입니다. 기본값으로 두면 번들의 모든 그래머를 등록합니다.
+
+| | 그래머 | 생성 시간 | RSS |
+| --- | --- | --- | --- |
+| 기본값 (전체 번들) | 364개 | ~2,020ms | ~250MB |
+| 사용하는 언어만 | 11개 | ~31ms | ~78MB |
+
+언어 목록은 포스트의 코드 펜스를 스캔해 자동으로 구성되므로 따로 관리할 필요가 없습니다. Shiki가 모르는 언어를 쓰면 파일명과 함께 빌드가 실패합니다.
+
 ## 피드
 
 `/feed.xml`은 요약만 담습니다 — 본문을 두 번 렌더링하지 않으려는 의도적인 선택입니다. 전문 피드가 필요하면 MDX를 HTML로 컴파일해 `<content:encoded>`에 넣으세요.
@@ -132,4 +159,4 @@ Pretendard는 OFL-1.1입니다 — `app/fonts/Pretendard-LICENSE.txt`.
 
 ## 스택
 
-Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · next-mdx-remote · Shiki · next-themes · Geist · Pretendard
+Next.js 15 (App Router) · TypeScript · Tailwind CSS v4 · next-mdx-remote · Shiki · next-themes · zod · Geist · Pretendard

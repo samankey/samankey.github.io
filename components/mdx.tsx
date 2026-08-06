@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { ComponentPropsWithoutRef } from "react";
 import { MDXRemote } from "next-mdx-remote/rsc";
-import rehypeShiki from "@shikijs/rehype";
+import rehypeShikiFromHighlighter from "@shikijs/rehype/core";
+import { bundledLanguages, createHighlighter, type Highlighter } from "shiki";
 import rehypeSlug from "rehype-slug";
 import rehypeAutolinkHeadings from "rehype-autolink-headings";
 import remarkGfm from "remark-gfm";
+import { getUsedCodeLanguages } from "@/lib/posts";
 
 /** Marks the anchor that rehype-autolink-headings appends to each heading. */
 const HEADING_ANCHOR_CLASS = "heading-anchor";
@@ -27,6 +29,25 @@ const shikiOptions = {
   },
   defaultColor: false,
 } as const;
+
+/**
+ * `@shikijs/rehype` already shares one highlighter process-wide via
+ * `getSingletonHighlighter`, so this is not about avoiding repeat construction.
+ * It is about `options.langs || Object.keys(bundledLanguages)`: left to its
+ * default the plugin registers every grammar in the bundle — 364 of them,
+ * measured at ~2s and ~170MB of resident memory. Passing a highlighter built
+ * from just the languages the posts fence with costs ~31ms and 11 grammars.
+ */
+let highlighter: Promise<Highlighter> | null = null;
+
+function getHighlighter(): Promise<Highlighter> {
+  highlighter ??= createHighlighter({
+    themes: Object.values(shikiOptions.themes),
+    langs: getUsedCodeLanguages((lang) => lang in bundledLanguages),
+  });
+
+  return highlighter;
+}
 
 function Anchor({ href = "", className: incoming, ...props }: ComponentPropsWithoutRef<"a">) {
   // The autolinked heading anchor is decoration, not prose — it opts out of the
@@ -108,7 +129,9 @@ const components = {
   ),
 };
 
-export function Mdx({ source }: { source: string }) {
+export async function Mdx({ source }: { source: string }) {
+  const shiki = await getHighlighter();
+
   return (
     <MDXRemote
       source={source}
@@ -119,7 +142,7 @@ export function Mdx({ source }: { source: string }) {
           rehypePlugins: [
             rehypeSlug,
             [rehypeAutolinkHeadings, autolinkOptions],
-            [rehypeShiki, shikiOptions],
+            [rehypeShikiFromHighlighter, shiki, shikiOptions],
           ],
         },
       }}
