@@ -2,7 +2,12 @@ import Link from "next/link";
 import type { ComponentPropsWithoutRef } from "react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypeShikiFromHighlighter from "@shikijs/rehype/core";
-import { bundledLanguages, createHighlighter, type Highlighter } from "shiki";
+import {
+  bundledLanguages,
+  createHighlighter,
+  type BundledLanguage,
+  type Highlighter,
+} from "shiki";
 import {
   transformerMetaHighlight,
   transformerNotationHighlight,
@@ -69,13 +74,34 @@ const shikiOptions = {
  */
 let highlighter: Promise<Highlighter> | null = null;
 
-function getHighlighter(): Promise<Highlighter> {
+// The predicate keeps only ids present in the bundle, which is exactly what
+// `BundledLanguage` names — the cast carries that fact into the type.
+const usedLanguages = () =>
+  getUsedCodeLanguages((lang) => lang in bundledLanguages) as BundledLanguage[];
+
+async function getHighlighter(): Promise<Highlighter> {
+  // A rejected promise must not stay cached. Left in place, every later render
+  // awaits the same rejection, so the dev server keeps erroring on refresh long
+  // after the cause was fixed and only a restart clears it.
   highlighter ??= createHighlighter({
     themes: Object.values(shikiOptions.themes),
-    langs: getUsedCodeLanguages((lang) => lang in bundledLanguages),
+    langs: usedLanguages(),
+  }).catch((error) => {
+    highlighter = null;
+    throw error;
   });
 
-  return highlighter;
+  const shiki = await highlighter;
+
+  // The language list is fixed when the highlighter is built, but in dev the
+  // process outlives content edits. A post added afterwards can fence a
+  // language that was never registered, and Shiki throws `Language X not found`
+  // for it on every render. Register what is missing instead of failing.
+  const loaded = new Set(shiki.getLoadedLanguages());
+  const missing = usedLanguages().filter((lang) => !loaded.has(lang));
+  if (missing.length > 0) await shiki.loadLanguage(...missing);
+
+  return shiki;
 }
 
 function Anchor({ href = "", className: incoming, ...props }: ComponentPropsWithoutRef<"a">) {
