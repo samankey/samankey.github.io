@@ -1,0 +1,124 @@
+---
+title: "상속에 의한 클래스 확장 (extends, super)"
+date: "2023-06-29"
+summary: "기존 클래스를 상속해 확장하는 방법과, super를 호출할 때와 참조할 때의 차이."
+tags: ["javascript", "oop"]
+---
+
+[클래스의 메서드](/blog/class-methods)에서 이어진다. 클래스는 다른 클래스를 상속받아 고유한 속성만 더해 확장할 수 있다.
+
+```js
+class Drink {
+  constructor(ml, container) {
+    this.ml = ml;
+    this.container = container;
+  }
+}
+
+class Alcohol extends Drink {
+  constructor(ml, container, volume) {
+    super(ml, container)
+    this.volume = volume;
+  }
+}
+
+const alcohol = new Alcohol(700, 'bottle', 40)
+console.log(alcohol) // Alcohol { ml: 700, container: 'bottle', volume: 40 }
+```
+
+## extends
+
+상속에 의한 클래스 확장은 기존 클래스를 상속받아 새로운 클래스를 확장하여 정의하는 것이다.
+
+<Img src="/images/class-inheritance/drink-hierarchy.png" alt="Drink 클래스가 ml과 container를 갖고, 이를 상속한 Alcohol은 volume, Soda는 carbonation level을 각각 더해 갖는 구조도" width="2016" height="1280" />
+
+Alcohol과 Soda는 Drink에 속하므로 Drink 속성을 가지지만 각각 고유의 속성도 있다. 그래서 Alcohol과 Soda는 상속을 통해 Drink 클래스의 속성을 그대로 사용하면서 고유 속성만 추가하여 확장 가능하다.
+
+## 동적 상속
+
+`extends` 키워드는 클래스뿐 아니라 생성자 함수를 상속받아 클래스를 확장할 수 있다.
+
+```js
+// 생성자 함수
+function Base(a) {
+  this.a = a;
+}
+
+// 생성자 함수를 상속받는 서브클래스
+class Derived extends Base {}
+
+const derived = new Derived(1);
+console.log(derived); // Derived {a: 1}
+```
+
+`extends` 키워드 다음에는 클래스뿐만 아니라 `[[Construct]]` 내부 메서드를 갖는 함수 객체로 평가될 수 있는 모든 표현식을 사용할 수 있다.
+
+```js
+function Base1() {}
+class Base2 {}
+
+let condition = true;
+
+class Derived extends (condition ? Base1 : Base2) {}
+```
+
+## super
+
+`super` 키워드는 함수처럼 호출할 수도 있고 `this`와 같이 식별자처럼 참조할 수도 있는 특수 키워드다.
+
+### super를 호출하면 수퍼클래스의 constructor를 호출한다
+
+```js
+class Base {
+  constructor(a, b) {
+    this.a = a;
+    this.b = b;
+  }
+}
+
+class Derived extends Base {
+  // 암묵적으로 constructor가 정의됨
+  // constructor(...arg) { super(...arg); }
+}
+
+const derived = new Derived(1, 2);
+console.log(derived); // Derived {a: 1, b: 2}
+```
+
+하지만 처음 설명한 Drink 클래스의 서브클래스처럼 내부에 추가된 프로퍼티가 있다면 `constructor`를 생략할 수 없다. `super` 키워드의 특징은 다음과 같다.
+
+- 서브클래스의 `constructor`를 생략하지 않는 경우 서브클래스의 `constructor`에서는 반드시 `super`를 호출
+- 서브클래스의 `constructor`에서 `super`를 호출하기 전엔 `this` 참조 불가
+- `super`는 반드시 서브클래스의 `constructor`에서만 호출
+
+### super를 참조하면 수퍼클래스의 메서드를 호출할 수 있다
+
+```js
+class Base {
+  constructor(name) {
+    this.name = name;
+  }
+
+  sayHi() {
+    return `Hi, ${this.name}`;
+  }
+}
+
+class Derived extends Base {
+  sayHi() {
+    return `${super.sayHi()}. How are you?`;
+  }
+}
+
+const derived = new Derived('ming');
+console.log(derived.sayHi()); // Hi, ming. How are you?
+```
+
+정적 메서드도 이와 같은 방식으로 호출할 수 있다.
+
+## 정리
+
+- `extends`로 기존 클래스를 상속해 고유 속성만 더해 확장한다
+- `extends` 뒤에는 클래스뿐 아니라 `[[Construct]]`를 갖는 표현식이면 다 올 수 있다 — 생성자 함수도, 삼항 연산자도
+- `super()` 호출은 수퍼클래스의 `constructor`를, `super.method()` 참조는 수퍼클래스의 메서드를 부른다
+- 서브클래스에 `constructor`를 쓰면 `super()`를 먼저 호출해야 하고, 그 전에는 `this`를 못 쓴다

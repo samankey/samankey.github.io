@@ -107,7 +107,10 @@ function loadPosts(): Post[] {
 
   const posts = all
     .filter((post) => !post.draft || !isProduction)
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
+    // Newest first. Two posts can share a date, so tie-break on slug — without
+    // it the comparator returns -1 for both (a, b) and (b, a), which is not a
+    // consistent ordering and leaves same-day posts in an arbitrary order.
+    .sort((a, b) => (a.date === b.date ? a.slug.localeCompare(b.slug) : a.date < b.date ? 1 : -1));
 
   reportBrokenLinks(posts);
 

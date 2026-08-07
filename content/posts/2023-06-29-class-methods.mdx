@@ -1,0 +1,74 @@
+---
+title: "클래스의 메서드 (constructor, prototype, static)"
+date: "2023-06-29"
+summary: "클래스에 정의할 수 있는 세 가지 메서드와, 프로토타입 메서드와 정적 메서드를 가르는 기준."
+tags: ["javascript", "oop"]
+---
+
+[클래스 (정의와 사용법)](/blog/es6-class)에서 이어진다.
+
+## Constructor
+
+인스턴스를 생성하고 초기화하기 위한 메서드다.
+
+```js
+class Car {
+  constructor(name) {
+    this.name = name;
+  }
+}
+
+const myCar = new Car('tesla'); // this.name은 'tesla'
+```
+
+`constructor` 내부에 선언한 프로퍼티가 클래스가 생성한 인스턴스의 프로퍼티로 추가된다.
+
+`constructor` 내부에서 `return`으로 값을 반환하면, 객체일 때는 그 객체가 반환되고 원시값일 때는 무시되고 `this`가 반환된다. `this`가 아닌 다른 값을 반환하는 것은 기본 동작을 훼손하는 것이기 때문에 `return`은 반드시 생략한다.
+
+## 프로토타입 메서드 (prototype)
+
+생성자 함수에서는 `prototype`에 명시적으로 붙여야 프로토타입 메서드가 됐지만, 클래스에서는 메서드를 그냥 정의하면 기본적으로 프로토타입 메서드가 된다.
+
+```js
+class Person {
+  constructor(name) {
+    this.name = name;
+  }
+
+  // 프로토타입 메서드, Person.prototype.sayHi 를 명시하지 않아도 된다
+  sayHi() {
+    console.log(`Hi, I'm ${this.name}`);
+  }
+}
+```
+
+## 정적 메서드 (static)
+
+클래스에 바인딩되어 인스턴스를 생성하지 않아도 호출할 수 있는 메서드다. 정적 메서드가 바인딩된 클래스는 인스턴스의 프로토타입 체인상에 존재하지 않기 때문에, 인스턴스는 정적 메서드를 상속받지 않는다.
+
+```js
+class Person {
+  constructor(name) {
+    this.name = name;
+  }
+
+  static sayHi() {
+    console.log(`Hi`);
+  }
+}
+```
+
+## 프로토타입 메서드와 정적 메서드의 차이
+
+1. 자신이 속해 있는 프로토타입 체인이 다르다
+2. 정적 메서드는 클래스로 호출하고, 프로토타입 메서드는 인스턴스로 호출한다
+3. 정적 메서드는 인스턴스의 프로퍼티나 메서드를 참조할 수 없지만, 프로토타입 메서드는 참조할 수 있다
+
+따라서 메서드 내부에서 인스턴스 프로퍼티를 참조해야 한다면 `this`를 사용해야 하며, 이 경우에는 프로토타입 메서드로 정의해야 한다.
+
+## 정리
+
+- `constructor`는 인스턴스를 초기화한다. `return`은 쓰지 않는다
+- 클래스 안에 그냥 정의한 메서드는 프로토타입 메서드가 된다
+- `static`은 클래스에 바인딩되어 인스턴스 없이 호출한다
+- 인스턴스 프로퍼티를 `this`로 참조해야 하면 프로토타입 메서드여야 한다
