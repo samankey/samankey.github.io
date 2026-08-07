@@ -92,6 +92,7 @@ tags: ["vue", "nuxt"]
 - `tags` — lowercase single words, two or three. Reuse existing tags before inventing new ones; each new tag creates a page.
 - `draft: true` hides the post from production builds while keeping it visible in dev.
 - Code fences need a language Shiki knows; only the languages actually used get their grammar loaded, so a new language is worth checking after the build. `filename=path` on the fence renders a caption, and `{1,3-5}` highlights lines.
+- Images live in `public/images/<slug>/` and are referenced by absolute path. Prefer `<Img src alt width height />` over markdown `![alt](src)` so the box is reserved and lazy-loaded images don't shift the page. Note the capital `I` — a lowercase `<img>` written directly in MDX skips the component map entirely and renders unstyled. Always write real alt text.
 
 Frontmatter is validated by zod and internal links are checked, both in [lib/posts.ts](lib/posts.ts). Broken links warn in dev and fail the production build.
 

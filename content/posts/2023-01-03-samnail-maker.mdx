@@ -1,0 +1,131 @@
+---
+title: "태그 스타일의 썸네일 메이커 프로젝트, Samnail-maker"
+date: "2023-01-03"
+summary: "velog 썸네일을 매번 피그마로 만드는 게 번거로워서 만든 도구. 태그 개수를 무엇으로 제한할지가 제일 오래 걸렸다."
+tags: ["vue", "nuxt", "project"]
+---
+
+글을 쓸 때마다 썸네일을 피그마로 만들고 있었다. 매번 파일을 열고, 텍스트를 넣고, 내보내는 과정이 글 쓰는 시간보다 길어지는 날이 있었다. 그래서 태그를 입력하면 썸네일이 되는 도구를 만들었다.
+
+[Samnail-maker](https://thumbsamnail.vercel.app/)에서 쓸 수 있다.
+
+<Img src="/images/samnail-maker/overview.gif" alt="Samnail-maker 화면. 태그를 입력하면 위쪽 캔버스에 반영된다" width="800" height="425" />
+
+## 사용 스택
+
+- Nuxt 2 (static)
+- SCSS
+- html2canvas
+- Vercel
+
+## 사용 방법
+
+### 태그 설정
+
+입력한 단어가 태그 모양으로 캔버스에 붙는다. 스타일은 Fill, Border, Ghost 세 가지다.
+
+<Img src="/images/samnail-maker/tag-input.gif" alt="태그를 입력하고 Fill, Border, Ghost 스타일을 바꾸는 모습" width="800" height="521" />
+
+썸네일은 목록에서 작게 보이기 때문에 글자가 뭉개지기 쉽다. `font-size`, `letter-spacing`, `line-height`를 그 크기에서 읽히도록 맞췄다. 태그는 Flex wrap으로 흐르게 하고, 최대 3줄까지만 쓰도록 했다.
+
+### 태그 개수를 무엇으로 제한할까
+
+3줄을 넘기면 캔버스를 벗어난다. 이걸 어디서 끊을지가 이 프로젝트에서 제일 오래 잡은 부분이다. 세 가지를 시도했다.
+
+**태그 개수로 제한.** 가장 먼저 떠오르는 방법이고 가장 먼저 버렸다. 글자 폭이 언어마다 다르다. 영어 다섯 글자와 한글 다섯 글자가 차지하는 자리가 다르니, 개수를 세는 건 실제로 넘치는지와 상관이 없다.
+
+**Byte 수로 제한.** `charCodeAt()`으로 문자열의 바이트 길이를 재서 끊으려 했다. 이모지에서 막혔다. `charCodeAt()`이 돌려주는 건 UTF-16 코드 유닛 하나이고, 이모지는 대개 두 개 이상을 차지한다. 여기에 피부색 같은 modifier가 붙으면 더 늘어난다. 눈에는 한 글자인데 계산 결과는 제각각이었다.
+
+참고 — [문자열 Byte 길이 구하기](https://programmingsummaries.tistory.com/239), [이모지와 유니코드](https://blog.hoseung.me/2022-08-25-emoji-and-unicode/), [charCodeAt()](https://developer.mozilla.org/ko/docs/Web/JavaScript/Reference/Global_Objects/String/charCodeAt)
+
+**엘리먼트 높이로 제한.** 결국 채택한 방법이다. 글자 수를 세는 대신 태그를 감싸는 박스의 실제 높이를 재서, 정해둔 값을 넘으면 마지막 태그를 되돌린다. 무엇이 넘쳤는지 계산하지 않고 넘쳤다는 사실만 보면 되니 언어도 이모지도 신경 쓸 필요가 없다.
+
+<Img src="/images/samnail-maker/height-limit.gif" alt="태그를 계속 추가하면 높이 제한에 걸려 마지막 태그가 사라지고 경고가 뜬다" width="800" height="521" />
+
+```js
+updated () {
+  // DOM이 업데이트 될 때마다 실행
+  this.setHeight();
+},
+methods: {
+  setHeight() {
+    // 키워드를 감싸는 전체 DOM 높이 체크
+    const height = document.querySelector(".textBox")?.offsetHeight;
+    this.height = height;
+    if (this.height > 256) {
+      this.tagList.pop();
+      this.$notify({title: '그러다 넘쳐요 😇', type: 'warning'})
+    }
+  }
+}
+```
+
+`updated()`는 DOM이 갱신된 뒤에 불리므로, 이 시점에는 실제로 그려진 높이를 읽을 수 있다. 다만 여기서 `tagList`를 건드리면 그게 다시 갱신을 일으킨다. 높이가 제한 아래로 내려가면서 멈추기는 하지만, 조건이 어긋나면 갱신이 계속 도는 구조라는 건 기억해둘 만하다.
+
+## 아이디 태그
+
+썸네일 오른쪽 아래에 아이디를 넣을 수 있게 했다. 태그와 달리 위치가 고정이고 한 줄이다.
+
+<Img src="/images/samnail-maker/id-tag.gif" alt="아이디 입력란에 @samankeyc를 입력하는 모습" width="800" height="205" />
+
+## 테마
+
+색 조합을 미리 만들어두고 고르게 했다. 배경과 글자, 태그 색이 함께 바뀐다.
+
+<Img src="/images/samnail-maker/theme.gif" alt="아래쪽 색 견본을 눌러 테마를 바꾸는 모습" width="407" height="328" />
+
+## 리셋
+
+입력을 다 지우고 처음 상태로 돌린다.
+
+<Img src="/images/samnail-maker/reset.gif" alt="리셋을 눌러 입력한 태그와 아이디가 모두 지워지는 모습" width="800" height="559" />
+
+## 저장
+
+`html2canvas`가 DOM 엘리먼트를 캔버스로 그려준다. 그 캔버스를 데이터 URI로 바꾸고, 임시 `<a>`를 만들어 클릭시켜 내려받는다.
+
+<Img src="/images/samnail-maker/save.gif" alt="save를 눌러 썸네일 이미지를 내려받는 모습" width="800" height="561" />
+
+```js
+downloadImage() {
+  html2canvas(this.$refs.canvas).then((canvas) => {
+    const imageUri = canvas.toDataURL();
+    this.downloadURI(imageUri, "thumbnail.png");
+  });
+},
+
+downloadURI(uri, name) {
+  const link = document.createElement("a");
+  link.download = name;
+  link.href = uri;
+  document.body.appendChild(link);
+  link.click();
+}
+```
+
+## Variation
+
+같은 도구로 만든 것들이다.
+
+<Img src="/images/samnail-maker/variation-default.png" alt="기본 테마로 만든 썸네일" width="1280" height="720" />
+
+<Img src="/images/samnail-maker/variation-black.png" alt="검은 배경 테마로 만든 썸네일" width="1280" height="720" />
+
+<Img src="/images/samnail-maker/variation-blue.png" alt="파란 배경 테마로 만든 썸네일" width="1280" height="720" />
+
+<Img src="/images/samnail-maker/variation-yellow.png" alt="노란 강조색 테마로 만든 썸네일" width="1280" height="720" />
+
+<Img src="/images/samnail-maker/variation-green.png" alt="초록 배경 테마로 만든 썸네일" width="1280" height="720" />
+
+## 추가 & 수정 예정
+
+**Drag & Drop.** 지금은 입력한 순서대로만 놓인다. 태그를 끌어서 순서를 바꿀 수 있으면 좋겠다.
+
+**자유도.** 정해둔 테마 안에서만 고를 수 있다. 색이나 배치를 직접 정할 수 있게 열어두고 싶다.
+
+## 정리
+
+- 썸네일을 매번 피그마로 만드는 게 번거로워서 만든 도구다
+- 태그를 몇 개까지 받을지는 글자 수나 바이트로 정할 수 없었다. 언어마다 글자 폭이 다르고, 이모지는 코드 유닛 개수가 제각각이다
+- 재려는 값을 바꾸면 풀렸다 — 글자를 세는 대신 그려진 박스의 높이를 쟀다
+- 이미지 저장은 `html2canvas`로 DOM을 캔버스에 그린 뒤 데이터 URI로 내려받는다

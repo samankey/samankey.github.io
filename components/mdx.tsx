@@ -109,6 +109,25 @@ function Anchor({ href = "", className: incoming, ...props }: ComponentPropsWith
   );
 }
 
+/**
+ * Plain <img>, not next/image: the assets are local and already sized for the
+ * column, next/image cannot optimize animated GIFs anyway, and staying off it
+ * keeps the door open for `output: "export"`. Pass width/height so the reserved
+ * box is right and lazy-loaded images below the fold don't shift the page.
+ */
+function PostImage({ alt = "", ...props }: ComponentPropsWithoutRef<"img">) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      className="my-6 h-auto w-full rounded-md border border-zinc-200 dark:border-zinc-800"
+      {...props}
+    />
+  );
+}
+
 const components = {
   a: Anchor,
   pre: CodeBlock,
@@ -139,6 +158,12 @@ const components = {
       {...props}
     />
   ),
+  // `img` covers markdown `![alt](src)`. `Img` is the same component under a
+  // capitalised name because MDX only routes markdown-generated nodes through
+  // this map — a literal lowercase <img> in an MDX file renders as a bare
+  // element and silently skips it. Use <Img> when width/height are needed.
+  img: PostImage,
+  Img: PostImage,
   hr: () => <hr className="my-12 border-zinc-200 dark:border-zinc-800" />,
   strong: (props: ComponentPropsWithoutRef<"strong">) => (
     <strong className="font-medium text-zinc-900 dark:text-zinc-100" {...props} />

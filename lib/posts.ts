@@ -221,8 +221,17 @@ function stripCode(content: string): string {
   return content.replaceAll(/```[\s\S]*?```/g, "").replaceAll(/`[^`\n]*`/g, "");
 }
 
+/**
+ * Strips markdown image syntax. `![alt](/path)` contains `](/path)`, so without
+ * this an image source reads as a page link — it is a file under public/ and is
+ * checked separately.
+ */
+function stripImages(content: string): string {
+  return content.replaceAll(/!\[[^\]]*\]\([^)]*\)/g, "");
+}
+
 function extractInternalLinks(content: string): string[] {
-  const prose = stripCode(content);
+  const prose = stripImages(stripCode(content));
   const links = [
     // [text](/path)
     ...prose.matchAll(/\]\((\/[^)\s]*)\)/g),
@@ -231,6 +240,16 @@ function extractInternalLinks(content: string): string[] {
   ];
 
   return links.map(([, href]) => href.replace(/[?#].*$/, ""));
+}
+
+/** Image sources, from markdown `![alt](/path)` or a `src` attribute in JSX. */
+function extractAssetPaths(content: string): string[] {
+  const prose = stripCode(content);
+
+  return [
+    ...prose.matchAll(/!\[[^\]]*\]\((\/[^)\s]*)\)/g),
+    ...prose.matchAll(/src=["'](\/[^"']*)["']/g),
+  ].map(([, src]) => src);
 }
 
 /**
@@ -258,11 +277,19 @@ function reportBrokenLinks(posts: Post[]): void {
         broken.push(`content/posts/${post.fileName} → ${href}`);
       }
     }
+
+    // A mistyped image path renders as a broken image with no other symptom,
+    // so hold it to the same standard as a link.
+    for (const src of extractAssetPaths(post.content)) {
+      if (!fs.existsSync(path.join(process.cwd(), "public", decodeURIComponent(src)))) {
+        broken.push(`content/posts/${post.fileName} → ${src} (public/ 에 없음)`);
+      }
+    }
   }
 
   if (broken.length === 0) return;
 
-  const message = `존재하지 않는 내부 링크:\n${broken.map((line) => `  · ${line}`).join("\n")}`;
+  const message = `존재하지 않는 내부 링크 또는 이미지:\n${broken.map((line) => `  · ${line}`).join("\n")}`;
 
   if (isProduction) throw new Error(message);
   console.warn(`\n⚠ ${message}\n`);
