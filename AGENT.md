@@ -101,16 +101,18 @@ Frontmatter is validated by zod and internal links are checked, both in [lib/pos
 Never report a post as done on the strength of the file existing.
 
 ```bash
-pnpm typecheck && pnpm lint && pnpm build
+pnpm typecheck && pnpm lint && pnpm build:verify
 ```
 
-**Do not start a server to check the result.** Every route here is statically prerendered, so the build writes the finished HTML to disk and you can read it directly:
+**`build:verify`, never plain `build`.** `next build` and `next dev` share `.next/`, and a build rewrites it — run one while the author's dev server is up and it deletes the files that server is writing, which then fails with `ENOENT … _buildManifest.js.tmp.*` on every refresh until restarted. `build:verify` sends the output to `.next-verify/` instead and leaves `.next/` alone. This has already happened once; do not rediscover it.
+
+**Do not start a server to check the result either.** Every route here is statically prerendered, so the build writes the finished HTML to disk and you can read it directly:
 
 ```
-.next/server/app/index.html
-.next/server/app/blog/<slug>.html
-.next/server/app/blog/tag/<tag>.html
-.next/server/app/sitemap.xml.body
+.next-verify/server/app/index.html
+.next-verify/server/app/blog/<slug>.html
+.next-verify/server/app/blog/tag/<tag>.html
+.next-verify/server/app/sitemap.xml.body
 ```
 
 This is what actually ships, and it sidesteps the dev server, which has served pre-edit HTML more than once. Check in those files:

@@ -15,6 +15,8 @@ const eslintConfig = [
     ignores: [
       "node_modules/**",
       ".next/**",
+      // `pnpm build:verify` writes here; it is build output like .next/**.
+      ".next-verify/**",
       "out/**",
       "build/**",
       "next-env.d.ts",

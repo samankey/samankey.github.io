@@ -14,10 +14,13 @@ pnpm dev
 | 스크립트 | 설명 |
 | --- | --- |
 | `pnpm dev` | 개발 서버 (Turbopack) |
-| `pnpm build` | 프로덕션 빌드 — 모든 포스트를 정적 생성 |
+| `pnpm build` | 프로덕션 빌드 — 모든 포스트를 정적 생성 (`.next/`) |
+| `pnpm build:verify` | 같은 빌드를 `.next-verify/`에 — dev 서버를 켠 채 쓸 수 있음 |
 | `pnpm start` | 빌드 결과 서빙 |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | `tsc --noEmit` |
+
+**dev 서버를 켠 상태에서 `pnpm build`를 돌리지 마세요.** `next build`와 `next dev`는 `.next/`를 공유하고 빌드가 그 디렉터리를 다시 씁니다. 돌아가던 dev 서버는 자기가 쓰던 파일이 사라져 `ENOENT … .next/static/development/_buildManifest.js.tmp.*`를 매 새로고침마다 뱉고, 재시작해야 풀립니다. 확인용 빌드는 `pnpm build:verify`를 쓰면 출력이 `.next-verify/`로 가서 dev 서버를 건드리지 않습니다.
 
 ## 구조
 

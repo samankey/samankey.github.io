@@ -42,3 +42,6 @@ next-env.d.ts
 
 # 예시 env는 커밋합니다
 !.env.example
+
+# 검증용 빌드 출력 (dev 서버의 .next 를 건드리지 않기 위해 분리)
+/.next-verify/
