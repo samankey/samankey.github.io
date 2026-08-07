@@ -1,0 +1,176 @@
+---
+title: "enum / const enum"
+date: "2025-02-23"
+summary: "둘의 가장 큰 차이는 런타임 동작이다. 다만 isolatedModules가 켜져 있으면 그 차이가 사라지고 제약만 남는다."
+tags: ["typescript"]
+---
+
+일반 열거형과 const 열거형의 가장 큰 차이는 런타임 동작에 있다.
+
+## 일반 열거형
+
+```ts
+enum Color {
+  Red = 1,
+  Green = 2,
+  Blue = 3
+}
+
+// 동적 조회 가능
+function getColorName(colorValue: number): string {
+  return Color[colorValue]; // "Red", "Green", 또는 "Blue" 반환
+}
+
+console.log(getColorName(2)); // 출력: "Green"
+```
+
+`Color` 열거형이 런타임에 객체로 존재하기 때문에 `Color[colorValue]`와 같은 동적 조회를 할 수 있다. 컴파일 결과를 보면 이름과 값을 양방향으로 넣어둔 객체가 만들어진다.
+
+```js
+var Color;
+(function (Color) {
+    Color[Color["Red"] = 1] = "Red";
+    Color[Color["Green"] = 2] = "Green";
+    Color[Color["Blue"] = 3] = "Blue";
+})(Color || (Color = {}));
+```
+
+`Color["Red"] = 1`을 넣고 그 결과를 다시 `Color[1] = "Red"`로 넣는다. 이 역방향 항목이 동적 조회를 가능하게 하는 것이다.
+
+## const 열거형
+
+```ts
+const enum Color {
+  Red = 1,
+  Green = 2,
+  Blue = 3
+}
+
+// 아래 코드는 컴파일 에러 발생
+function getColorName(colorValue: number): string {
+  return Color[colorValue];
+}
+```
+
+```text
+error TS2476: A const enum member can only be accessed using a string literal.
+```
+
+const 열거형은 컴파일 시점에 완전히 제거되고 값만 인라인되어, `Color` 객체가 런타임에 존재하지 않는다. 따라서 `Color[colorValue]` 같은 동적 조회를 할 수 없다.
+
+```ts
+const enum Color { Red = 1, Green = 2, Blue = 3 }
+export const x = Color.Green;
+```
+
+```js
+export const x = 2 /* Color.Green */;
+```
+
+선언 자체가 사라지고 사용처에 값이 박힌다.
+
+## 동적 조회가 필요하면
+
+매핑을 직접 만들어야 한다.
+
+```ts
+const enum Color {
+  Red = 1,
+  Green = 2,
+  Blue = 3
+}
+
+const ColorNames = {
+  1: "Red",
+  2: "Green",
+  3: "Blue"
+};
+
+function getColorName(colorValue: number): string {
+  return ColorNames[colorValue as keyof typeof ColorNames] || "Unknown";
+}
+
+console.log(getColorName(2)); // 출력: "Green"
+```
+
+동작하지만 숫자를 두 곳에 적게 된다. 열거형에 멤버를 추가하고 `ColorNames`를 잊으면 아무도 알려주지 않는다.
+
+키를 열거형에서 가져오면 그 문제가 없어진다.
+
+```ts
+const ColorNames: Record<Color, string> = {
+  [Color.Red]: "Red",
+  [Color.Green]: "Green",
+  [Color.Blue]: "Blue",
+};
+
+function getColorName(colorValue: number): string {
+  return ColorNames[colorValue as Color] ?? "Unknown";
+}
+```
+
+`Color.Blue`를 빼면 컴파일이 멈춘다.
+
+```text
+error TS2741: Property '[Color.Blue]' is missing in type '{ 1: string; 2: string; }'
+  but required in type 'Record<Color, string>'.
+```
+
+매핑을 직접 관리해야 하는 것은 마찬가지지만, 빠뜨렸을 때 알려주는 쪽이 낫다.
+
+## isolatedModules에서는 지워지지 않는다
+
+여기까지가 교과서적인 설명이고, 실제 프로젝트에서는 한 가지가 더 붙는다. `isolatedModules`가 켜져 있으면 **const 열거형이 지워지지 않는다.**
+
+```ts
+export const enum Size { S = 1, M = 2 }
+```
+
+`isolatedModules` 없이 컴파일하면 선언이 사라지고 사용처에 `2 /* Size.M */`이 박힌다. 켜고 컴파일하면 일반 열거형과 똑같은 객체가 나온다.
+
+```js
+export var Size;
+(function (Size) {
+    Size[Size["S"] = 1] = "S";
+    Size[Size["M"] = 2] = "M";
+})(Size || (Size = {}));
+```
+
+사용처도 인라인되지 않고 `import`가 그대로 남는다. `isolatedModules`는 파일을 하나씩 따로 변환한다는 뜻이고, 그러면 다른 파일에 있는 열거형의 값을 알 수 없으니 인라인할 방법이 없다. 그래서 TypeScript가 인라인을 포기하고 객체를 남긴다.
+
+문제는 **타입 검사 쪽 제약은 그대로 남는다**는 것이다. 객체가 런타임에 있는데도 `Color[colorValue]`는 여전히 TS2476으로 막힌다. 제약은 받고 이점은 못 받는 상태가 된다.
+
+`declare const enum`은 아예 쓸 수 없다.
+
+```text
+error TS2748: Cannot access ambient const enums when 'isolatedModules' is enabled.
+```
+
+Next.js가 만들어주는 `tsconfig.json`에는 `isolatedModules`가 켜져 있다. 이 블로그도 그렇다. Babel, SWC, esbuild처럼 파일 단위로 변환하는 도구를 쓰면 사정이 같다. 즉 오늘날 대부분의 프론트엔드 프로젝트에서 const 열거형은 기대한 대로 동작하지 않는다.
+
+번들 크기를 줄이려고 const 열거형을 고른다면, 먼저 자기 설정에서 실제로 인라인이 되는지 컴파일 결과를 확인하는 것이 좋다.
+
+## 문자열 열거형에는 역방향 조회가 없다
+
+역방향 조회는 숫자 열거형만의 기능이다.
+
+```ts
+enum Color { Red = "r", Green = "g" }
+
+Color["r"];
+```
+
+```text
+error TS7053: Element implicitly has an 'any' type because expression of type '"r"'
+  can't be used to index type 'typeof Color'.
+```
+
+컴파일 결과에도 `Color["Red"] = "r"` 한 방향만 들어간다. 값으로 이름을 찾아야 한다면 숫자 열거형을 쓰거나, 위의 `Record` 매핑처럼 직접 만들어야 한다.
+
+## 정리
+
+- 일반 열거형은 런타임에 객체로 남고, 그 객체에 역방향 항목이 있어서 `Color[2]`로 이름을 찾을 수 있다
+- const 열거형은 선언이 사라지고 값이 인라인되므로 동적 조회가 불가능하다 (`TS2476`)
+- **`isolatedModules`가 켜져 있으면 const 열거형도 객체로 남는다.** 인라인 이점은 없고 조회 제약만 남는다 — Next.js 기본 설정이 여기 해당한다
+- 동적 조회가 필요하면 `Record<Color, string>`로 매핑을 만든다. 멤버를 빠뜨리면 컴파일이 막아준다
+- 역방향 조회는 숫자 열거형만 된다. 문자열 열거형에는 없다
