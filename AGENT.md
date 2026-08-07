@@ -103,10 +103,19 @@ Never report a post as done on the strength of the file existing.
 pnpm typecheck && pnpm lint && pnpm build
 ```
 
-Then serve the production build and actually look at it — `preview_start` with the `blog-prod` config (port 3112), not the dev server, which has served stale HTML after edits more than once. Check:
+**Do not start a server to check the result.** Every route here is statically prerendered, so the build writes the finished HTML to disk and you can read it directly:
 
-- the post URL returns 200, and any new tag pages do too
-- it lands in the right year group on `/`, in the right order
+```
+.next/server/app/index.html
+.next/server/app/blog/<slug>.html
+.next/server/app/blog/tag/<tag>.html
+.next/server/app/sitemap.xml.body
+```
+
+This is what actually ships, and it sidesteps the dev server, which has served pre-edit HTML more than once. Check in those files:
+
+- the post's HTML exists, and a file exists for every new tag
+- it lands in the right year group on `/`, in the right order — strip `<script>` first, since the inlined RSC payload repeats the visible text
 - code blocks are highlighted — especially a language the repo has not used before
 - prev/next links point where they should
 
