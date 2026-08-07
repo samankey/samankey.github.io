@@ -1,0 +1,116 @@
+---
+title: "vue / $nextTick() 사용하기"
+date: "2022-09-04"
+summary: "DOM이 아직 갱신되지 않은 시점에 DOM을 만지려 할 때, 그리고 $forceUpdate를 꺼내기 전에 확인할 것."
+tags: ["vue", "nuxt"]
+---
+
+Vue는 상태를 바꿔도 DOM을 그 자리에서 고치지 않는다. 같은 틱에 일어난 변경을 모아 다음 마이크로태스크에서 한 번에 반영한다. 그래서 상태를 바꾼 직후에 DOM을 찾으면 아직 없거나, 갱신 전 상태로 남아 있다.
+
+`$nextTick()`은 그 갱신이 끝난 뒤로 콜백을 미루는 메서드다. 인자로 함수를 받고, 넘기지 않으면 Promise를 반환한다.
+
+```ts
+this.$nextTick(() => { /* ... */ });
+await this.$nextTick();
+```
+
+## 아직 없는 DOM 찾기
+
+```vue
+<template>
+  <div id="app">
+    <div v-for="item in list" :key="item">
+      <div :id="`item-${item}`" />
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  data () {
+    return { list: [] };
+  },
+  created () {
+    for (let i = 0; i < 100; i++) this.list.push(i);
+
+    const dom = document.getElementById('item-0');
+    dom.style.backgroundColor = 'red'; // TypeError — dom이 null
+  }
+};
+</script>
+```
+
+`created` 시점에는 첫 렌더가 아직 일어나지 않았으므로 `item-0`은 존재하지 않는다. `getElementById`가 `null`을 돌려주고, 거기서 `.style`을 읽다 터진다.
+
+콜백을 렌더 뒤로 미루면 해결된다.
+
+```js
+this.$nextTick(() => {
+  const dom = document.getElementById('item-0');
+  dom.style.backgroundColor = 'red';
+});
+```
+
+대신 이 코드는 첫 페인트 이후에 실행되므로, 배경색이 칠해지지 않은 프레임이 한 번 보일 수 있다. 처음부터 그 상태로 그려져야 하는 것이라면 `$nextTick`으로 덧칠하는 대신 `:style`이나 `:class`로 렌더에 포함시키는 편이 낫다.
+
+## 중간 상태는 그려지지 않는다
+
+```vue
+<template>
+  <div>{{ msg }}</div>
+</template>
+
+<script>
+export default {
+  data () {
+    return { msg: 'One' };
+  },
+  mounted () {
+    this.msg = 'Two';
+
+    this.$nextTick(() => {
+      this.msg = 'Three';
+    });
+  }
+};
+</script>
+```
+
+화면에 `Two`가 보일까. 보이지 않는다. `One` 다음에 바로 `Three`다.
+
+`msg = 'Two'`는 렌더를 큐에 넣고, `$nextTick`의 콜백은 그 뒤에 붙는다. 큐가 비워질 때 렌더가 먼저 돌아 DOM 텍스트는 실제로 `Two`가 되지만, 이어서 콜백이 `Three`를 넣고 그 렌더까지 같은 큐에서 처리된다. 전부 하나의 마이크로태스크 안에서 끝나므로 브라우저는 그 사이에 페인트할 기회를 얻지 못한다. `Two`는 DOM에 잠깐 존재했을 뿐 화면에 나온 적이 없다.
+
+`$nextTick`을 "다음 프레임"으로 이해하면 이 결과가 이상해 보인다. 다음 프레임이 아니라 **DOM 갱신 직후**로 읽어야 한다. 실제로 페인트 이후가 필요하면 `requestAnimationFrame`을 쓴다.
+
+## $forceUpdate 전에
+
+상태는 바꿨는데 화면이 그대로일 때 꺼내게 되는 메서드다. 해당 인스턴스를 다시 렌더한다.
+
+```js
+methods: {
+  update () {
+    this.$forceUpdate();
+  }
+}
+```
+
+다만 이 상황은 대개 렌더링이 밀린 게 아니라 **변경이 반응형으로 감지되지 않은** 것이다. Vue 2에서 흔한 두 가지는 객체에 없던 프로퍼티를 추가하는 것과 배열을 인덱스로 바꾸는 것이다.
+
+```js
+this.form.email = 'a@b.c';   // form에 email이 없었다면 감지되지 않음
+this.list[0] = 'changed';    // 감지되지 않음
+```
+
+```js
+this.$set(this.form, 'email', 'a@b.c');
+this.$set(this.list, 0, 'changed');
+```
+
+원인을 이렇게 고치면 `$forceUpdate`는 필요 없다. 렌더는 값싼 작업이 아니고, 강제로 미는 코드가 남아 있으면 다음 사람이 원인을 다시 찾아야 한다. Vue 3는 Proxy 기반이라 이 두 경우가 애초에 문제되지 않는다.
+
+## 정리
+
+- `$nextTick()`은 다음 프레임이 아니라 DOM 갱신 직후
+- 아직 없는 DOM을 찾는 문제라면 대체로 `created` 대신 `mounted`, 또는 `ref`로 해결된다
+- 페인트 이후가 필요하면 `requestAnimationFrame`
+- `$forceUpdate`가 당겨질 때는 반응형 감지가 빠진 곳을 먼저 찾기
