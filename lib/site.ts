@@ -5,11 +5,11 @@
 const url = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
 
 export const site = {
-  name: "Mingi Choi",
-  title: "Mingi Choi",
+  name: "samankey",
+  title: "samankey",
   description: "글쓰기, 프론트엔드, 그리고 만드는 일에 대한 기록.",
   url,
   locale: "ko_KR",
-  email: "sam@gubgoo.com",
-  github: "https://github.com/mingichoi",
+  email: "samankeycc@gmail.com",
+  github: "https://github.com/samankey",
 } as const;
