@@ -1,0 +1,68 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # Lets a failed deploy be retried from the Actions tab without an empty commit.
+  workflow_dispatch:
+
+# GitHub Pages needs these; the default token is read-only.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. Queue rather than cancel, so a push that lands mid-run
+# still ends with the newer commit live.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Baked into canonical URLs, OG tags, RSS and the sitemap at build time.
+      # Change this here if the site ever moves to its own domain.
+      NEXT_PUBLIC_SITE_URL: https://samankey.github.io
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # The same gates as local work. A broken internal link or a missing image
+      # fails the build rather than shipping a dead page.
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build:pages
+
+      # `_next` starts with an underscore, which Jekyll would skip.
+      - run: touch out/.nojekyll
+
+      # A silent empty upload would publish a blank site.
+      - name: Check the export
+        run: |
+          test -f out/index.html
+          test -f out/opengraph-image.png
+          echo "글 $(ls out/blog/*.html | wc -l)편"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

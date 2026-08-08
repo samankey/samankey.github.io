@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "build:verify": "NEXT_DIST_DIR=.next-verify next build --turbopack",
-    "start": "next start",
+    "build:verify": "NEXT_DIST_DIR=.next-verify next build --turbopack && node scripts/name-og-images.mjs .next-verify",
+    "build:pages": "NEXT_DIST_DIR=out next build --turbopack && node scripts/name-og-images.mjs out",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },

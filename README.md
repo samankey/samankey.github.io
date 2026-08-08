@@ -9,18 +9,28 @@ pnpm install
 pnpm dev
 ```
 
-배포 전에 `NEXT_PUBLIC_SITE_URL`을 실제 도메인으로 설정하세요 (`.env.example` 참고). canonical, OG 태그, RSS, sitemap URL이 모두 이 값을 기준으로 생성되며, 미설정 시 `http://localhost:3000`으로 폴백합니다.
-
 | 스크립트 | 설명 |
 | --- | --- |
 | `pnpm dev` | 개발 서버 (Turbopack) |
 | `pnpm build` | 프로덕션 빌드 — 모든 포스트를 정적 생성 (`.next/`) |
 | `pnpm build:verify` | 같은 빌드를 `.next-verify/`에 — dev 서버를 켠 채 쓸 수 있음 |
-| `pnpm start` | 빌드 결과 서빙 |
+| `pnpm build:pages` | 배포용 빌드 — `out/`에 내보내고 OG 이미지 이름을 정리 |
 | `pnpm lint` | ESLint |
 | `pnpm typecheck` | `tsc --noEmit` |
 
+`pnpm start`는 없습니다. `output: "export"`는 정적 파일만 내놓기 때문에 `next start`가 동작하지 않습니다. 빌드 결과를 브라우저로 보려면 `npx serve out` 같은 정적 서버를 쓰세요.
+
 **dev 서버를 켠 상태에서 `pnpm build`를 돌리지 마세요.** `next build`와 `next dev`는 `.next/`를 공유하고 빌드가 그 디렉터리를 다시 씁니다. 돌아가던 dev 서버는 자기가 쓰던 파일이 사라져 `ENOENT … .next/static/development/_buildManifest.js.tmp.*`를 매 새로고침마다 뱉고, 재시작해야 풀립니다. 확인용 빌드는 `pnpm build:verify`를 쓰면 출력이 `.next-verify/`로 가서 dev 서버를 건드리지 않습니다.
+
+## 배포
+
+`main`에 푸시하면 [GitHub Actions](.github/workflows/deploy.yml)가 정적 내보내기를 빌드해 GitHub Pages로 올립니다. <https://samankey.github.io>
+
+`NEXT_PUBLIC_SITE_URL`은 워크플로 파일에 적혀 있습니다. canonical, OG 태그, RSS, sitemap URL이 전부 이 값으로 생성되므로 도메인을 옮기면 그 한 줄을 고치면 됩니다. 로컬 빌드에서는 미설정 시 `http://localhost:3000`으로 폴백합니다 (`.env.example` 참고).
+
+### OG 이미지 이름
+
+Next의 `opengraph-image` 파일 규칙은 확장자 없는 파일을 내놓습니다. Vercel에서는 라우트가 Content-Type을 직접 실어 보내니 문제가 없지만, 정적 호스팅은 이름만 보고 판단하므로 GitHub Pages가 `application/octet-stream`으로 내려보내고 크롤러가 거부합니다 ([vercel/next.js#82177](https://github.com/vercel/next.js/issues/82177)). 그래서 빌드 뒤 [scripts/name-og-images.mjs](scripts/name-og-images.mjs)가 `.png`를 붙이고 참조를 맞춥니다. `build:verify`와 `build:pages` 모두 이 단계를 포함합니다.
 
 ## 구조
 

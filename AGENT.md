@@ -109,11 +109,13 @@ pnpm typecheck && pnpm lint && pnpm build:verify
 **Do not start a server to check the result either.** Every route here is statically prerendered, so the build writes the finished HTML to disk and you can read it directly:
 
 ```
-.next-verify/server/app/index.html
-.next-verify/server/app/blog/<slug>.html
-.next-verify/server/app/blog/tag/<tag>.html
-.next-verify/server/app/sitemap.xml.body
+.next-verify/index.html
+.next-verify/blog/<slug>.html
+.next-verify/blog/tag/<tag>.html
+.next-verify/sitemap.xml
 ```
+
+These sit at the top level because the site is a static export — the output is the deployable site itself, not a server bundle.
 
 This is what actually ships, and it sidesteps the dev server, which has served pre-edit HTML more than once. Check in those files:
 
@@ -124,4 +126,4 @@ This is what actually ships, and it sidesteps the dev server, which has served p
 
 Commit only after that. One post per commit, subject `Add post: <title>`. If you changed or corrected anything the author gave you, put that in the commit body.
 
-There is no remote yet — commit locally and leave pushing alone.
+Pushing to `main` deploys: GitHub Actions builds the static export and publishes it to GitHub Pages at <https://samankey.github.io>. Ask before pushing — a commit that lands is a post that is live.

@@ -2,6 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /**
+   * GitHub Pages serves files, not a Node server, so every route has to be a
+   * file on disk. Nothing here needs a request: there is no middleware, no
+   * server action, and no route that reads cookies, headers or search params.
+   */
+  output: "export",
+
+  /**
    * `next build` and `next dev` share `.next/`, and a build rewrites it. Running
    * a verification build while a dev server is up deletes the files that server
    * is actively writing, and it then fails with

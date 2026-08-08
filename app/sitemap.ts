@@ -2,6 +2,9 @@ import type { MetadataRoute } from "next";
 import { getAllPosts, getAllTags, getPostsByTag } from "@/lib/posts";
 import { site } from "@/lib/site";
 
+/** Static export: this route is a build-time artifact, not a request handler. */
+export const dynamic = "force-static";
+
 export default function sitemap(): MetadataRoute.Sitemap {
   const posts = getAllPosts();
 

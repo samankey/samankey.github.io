@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Mdx } from "@/components/mdx";
 import { PostNav } from "@/components/post-nav";
 import { TagList } from "@/components/tag-list";
+import { ogSize } from "@/lib/og";
 import { formatDate, getAdjacentPosts, getAllPosts, getPost } from "@/lib/posts";
 
 type PageProps = { params: Promise<{ slug: string }> };
@@ -29,6 +30,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title: post.title,
       description: post.summary,
       publishedTime: post.date,
+      images: [
+        {
+          url: `${url}/opengraph-image.png`,
+          width: ogSize.width,
+          height: ogSize.height,
+          alt: `${post.title} — ${formatDate(post.date)}`,
+        },
+      ],
     },
   };
 }
