@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { PostList } from "@/components/post-list";
+import { ogSize } from "@/lib/og";
 import { getAllTags, getPostsByTag, getPostsByYear } from "@/lib/posts";
 import { site } from "@/lib/site";
 
@@ -26,7 +27,20 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title,
     description: `${label} 태그가 붙은 글 ${posts.length}개`,
     alternates: { canonical: url },
-    openGraph: { url, title: `${title} — ${site.name}` },
+    openGraph: {
+      url,
+      title: `${title} — ${site.name}`,
+      // Declaring openGraph here would otherwise drop the parent's image, and
+      // naming the file directly is what gets it a .png URL. See page.tsx for
+      // a post, which has the same two reasons.
+      images: [
+        {
+          url: `${url}/opengraph-image.png`,
+          ...ogSize,
+          alt: `#${label} — 글 ${posts.length}개`,
+        },
+      ],
+    },
   };
 }
 
