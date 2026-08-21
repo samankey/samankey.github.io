@@ -2,7 +2,10 @@ import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { site } from "@/lib/site";
 
-const nav = [{ href: "/about", label: "about" }];
+const nav = [
+  { href: "/about", label: "about" },
+  { href: "/resume", label: "resume" },
+];
 
 export function SiteHeader() {
   return (
