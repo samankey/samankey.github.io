@@ -1,0 +1,164 @@
+---
+title: "토큰이 사라져도 빌드는 통과한다"
+date: "2026-09-02"
+summary: "Tailwind v4는 정의되지 않은 색상 토큰을 참조하는 클래스를 에러 없이 그냥 만들지 않는다. 빌드·타입 검사·테스트가 다 통과하고 화면의 스타일만 빠진다."
+tags: ["tailwind", "css", "design-system"]
+---
+
+디자인 토큰이 이름 변경되거나 삭제되면 그 토큰을 쓰던 클래스는 CSS에서 사라진다. 그런데 JSX에는 클래스명이 문자열로 남아 있으니 빌드도 타입 검사도 통과한다. 아무 데서도 안 걸리고 화면의 스타일만 없다.
+
+## 재현
+
+Tailwind v4에서 클래스 네 개를 쓰고 색상 토큰은 하나만 정의했다.
+
+```css
+/* in.css */
+@import "tailwindcss" source(none);
+@source "./page.tsx";
+
+@theme {
+  --color-brand-ok: #ff0000;
+}
+```
+
+```tsx
+// page.tsx
+export default () => (
+  <div className="text-brand-ok bg-brand-missing border-brand-ok text-brand-typo" />
+);
+```
+
+`--color-brand-ok`만 있으니 `bg-brand-missing`과 `text-brand-typo`는 근거가 없다. 빌드하면 이렇게 된다.
+
+```text
+생성된 유틸리티: .border-brand-ok  .text-brand-ok
+경고 수: 0
+```
+
+유틸리티 두 개만 나왔다. 없는 토큰을 쓴 클래스 두 개는 **CSS에 아예 등장하지 않는다.** 그리고 경고가 0건이다. 빌드는 예외 없이 정상 종료한다.
+
+## 왜 아무 게이트에도 안 걸리나
+
+Tailwind v4는 `@theme` 블록의 CSS 변수에서 유틸리티를 만든다. `--color-brand-missing`이 없으면 `bg-brand-missing`을 만들 근거가 없으니 만들지 않는다. 여기서 중요한 건 **"만들지 않는다"가 "에러다"와 다르다**는 점이다. Tailwind는 소스를 스캔해 나온 문자열 중 아는 것만 유틸리티로 바꾸고 모르는 것은 지나간다. 오타든 삭제된 토큰이든 자기가 모르는 클래스일 뿐이다.
+
+그 뒤로는 아무도 이 문제를 볼 수 없다.
+
+- **타입 검사** — `className`은 `string`이다. `"bg-brand-missing"`은 완벽하게 유효한 문자열이다
+- **빌드** — CSS 생성이 성공했고 JSX 컴파일도 성공했다. 둘 사이의 관계를 아는 단계가 없다
+- **테스트** — 렌더링 결과의 `class` 속성에는 클래스명이 그대로 있다. 스냅샷도 통과한다
+- **리뷰** — diff에 보이는 건 토큰 JSON에서 한 줄 빠진 것뿐이다. 그 이름을 쓰는 곳이 어디인지는 diff에 없다
+
+참조 체인만 끊기고 검증 게이트는 전부 초록색이다. 남는 건 "이 색이 왜 안 나오지"를 누군가 눈으로 발견하는 일이다.
+
+## 가드를 처음 돌렸을 때
+
+그래서 사용처를 검사하는 스크립트를 만들었다. 정의된 토큰 목록과 코드에서 쓰는 클래스를 대조하는 것이다. 처음 돌렸더니 클래스 785건·CSS 변수 62건 중 **6종이 이미 깨진 채 운영 중**이었다.
+
+| 사용처 | 원인 |
+| --- | --- |
+| `text-text-headline` 36곳 | Figma에서 `Text/HeadLine` → `Text/Headline` 리네임 진행 중. 코드가 토큰보다 앞섰다 |
+| `text-text-text-level3` | 접두사 중복 — `text-text-level3`이 맞다 |
+| `divide-border-border-basic` | 접두사 중복 |
+| `border-border-divider-line` | 존재하지 않는 토큰 |
+| `text-icon-sub` | 존재하지 않는 토큰 |
+| `text-button-text-red` | 존재하지 않는 토큰 |
+
+접두사 중복이 눈에 띈다. `text-` 유틸리티에 `text-level3` 토큰을 쓰면 `text-text-level3`이 되는데 여기서 한 번 더 붙여 쓴 것이다. 사람 눈에는 그게 그거처럼 보인다.
+
+## 검사 방법
+
+정공법은 AST를 파싱해 클래스명을 뽑는 것이지만 줄 단위 정규식으로 충분했다. 대신 오탐을 막는 장치가 몇 개 필요했다.
+
+**접두사를 긴 것부터 놓는다.** 색상을 소비하는 유틸리티 접두사를 배열로 두고 그 순서로 매칭하는데, `border`가 `border-t`보다 먼저 오면 `border-t-basic`에서 토큰 이름을 `t-basic`으로 잘못 읽는다.
+
+```ts
+const COLOR_UTILITY_PREFIXES = [
+  "border-t", "border-r", "border-b", "border-l",
+  "border-x", "border-y", "border-s", "border-e", "border",
+  "divide-x", "divide-y", "divide",
+  // ... bg, text, ring, outline, fill, stroke 등
+] as const;
+
+const UTILITY_CLASS_PATTERN = new RegExp(
+  `(?<![a-zA-Z0-9-])(?:${COLOR_UTILITY_PREFIXES.join("|")})-([a-z][a-z0-9-]*)`,
+  "g",
+);
+```
+
+앞의 `(?<![a-zA-Z0-9-])`는 단어 중간에서 걸리는 것을 막는다. 이게 없으면 `my-text-helper` 같은 식별자에서 `text-helper`를 클래스로 착각한다.
+
+**네임스페이스로 한 번 더 거른다.** 정규식만으로는 `text-center`나 `bg-white`처럼 토큰과 무관한 기본 유틸리티도 다 걸린다. 그래서 토큰 이름의 첫 세그먼트를 네임스페이스로 보고, 디자인 토큰 네임스페이스에 속한 것만 검사 대상에 넣는다.
+
+```ts
+/** `button-surface-white` → `button` */
+export function toNamespace(tokenName: string): string {
+  return tokenName.split("-")[0] ?? "";
+}
+```
+
+**산출물은 검사하지 않는다.** `theme.css`와 `color-tokens.json`은 토큰에서 생성되는 파일이다. 사용처가 아니라 정의처라서 스캔 대상에서 뺀다. 안 그러면 정의가 사용으로 잡혀 전부 통과해버린다.
+
+**`var()`의 fallback은 건너뛴다.** CSS 변수 직접 참조도 같이 본다. 다만 `var(--x, #000)`처럼 fallback이 있으면 정의가 없어도 동작하도록 일부러 쓴 것이므로 위반이 아니다.
+
+```ts
+const CSS_VAR_USAGE_PATTERN = /var\(\s*(--[a-z][a-z0-9-]*)\s*([,)])/g;
+```
+
+두 번째 캡처가 `,`면 fallback이 있다는 뜻이라 넘긴다.
+
+## 못 잡는 것
+
+정규식은 리터럴만 본다. 클래스명을 런타임에 조립하면 걸리지 않는다.
+
+```tsx
+<span className={`text-${level}`} />
+```
+
+`text-` 다음이 `$`라서 토큰 이름을 읽을 수 없다. 이건 이 방식의 한계이고, 대신 클래스명을 문자열로 조립하지 않는 쪽을 규칙으로 잡았다. `cva`의 variant 정의는 리터럴이라 정상적으로 잡힌다.
+
+## 예외를 두 종류로 가른다
+
+가드가 있어도 예외는 생긴다. 위 표의 `text-text-headline` 36곳이 그 예다. Figma 리네임이 진행 중인 동안은 코드가 토큰보다 앞서 있어서 고칠 수도 없고 실패시킬 수도 없다.
+
+그래서 allowlist를 두는데 두 종류를 같은 목록에 두지 않았다.
+
+```json
+{
+  "classes": {},
+  "vars": {
+    "--toast-top-offset": "소비처에서 주입하는 오프셋 (기본값 없음)",
+    "--toast-mobile-top-offset": "소비처에서 주입하는 오프셋 (기본값 없음)"
+  }
+}
+```
+
+`classes`는 **갚아야 하는 부채**다. 토큰이 없어졌는데 코드가 남은 것이라 신규 추가를 금지하고 하나씩 비워 나간다. 지금은 0건이다.
+
+`vars`는 **설계상 남는 것**이다. 소비처가 값을 주입하도록 만든 변수라 기본 정의가 없는 게 정상이다. 비울 대상이 아니다.
+
+둘을 섞으면 목록의 길이가 아무 의미가 없어진다. 갈라 두면 `classes`가 0인지가 곧 부채가 0인지다.
+
+동작은 세 가지다. 새 위반은 즉시 실패, allowlist에 있는 것은 경고만, 그리고 **해결된 항목이 allowlist에 남아 있으면 지우라고 알려준다.**
+
+```ts
+const staleAllowlistEntries = [
+  ...Object.keys(allowlist.classes),
+  ...Object.keys(allowlist.vars),
+].filter((name) => !knownViolations.some((v) => v.name === name));
+```
+
+마지막 것이 없으면 예외 목록이 계속 자란다. 고쳐도 목록에서 빠지지 않으니 다음 사람은 그게 아직 깨진 줄 안다.
+
+## 린터로 안 되나
+
+`eslint-plugin-tailwindcss`에는 Tailwind 클래스가 아닌 클래스명을 잡는 `no-custom-classname` 규칙이 있다. 겨냥하는 문제의 종류는 같다.
+
+이 프로젝트에서는 쓰지 않았는데 검사해야 할 것이 클래스명만이 아니었기 때문이다. `var(--token)` 직접 참조도 같이 봐야 했고, 부채와 설계상 예외를 구분하는 allowlist가 필요했고, 판단 기준이 되는 토큰 목록은 생성된 `theme.css`의 `@theme` 블록이었다. 결국 직접 만들 수밖에 없는 부분이 남았다.
+
+## 정리
+
+- Tailwind v4는 정의되지 않은 토큰을 참조하는 클래스를 **에러 없이 그냥 만들지 않는다.** 경고도 0건이다
+- `className`은 문자열이라 타입 검사·빌드·테스트·리뷰가 전부 통과한다. 참조 체인만 끊긴다
+- 토큰과 사용처를 대조하는 검사를 CI에 따로 두는 것 말고는 방법이 없다
+- 정규식으로 충분하지만 접두사 순서, 단어 경계, 네임스페이스, 산출물 제외가 필요하다. 런타임에 조립한 클래스명은 못 잡는다
+- 예외 목록은 **부채와 설계상 남는 것을 갈라 둔다.** 그리고 해결된 항목을 지우라고 알려주게 만든다
