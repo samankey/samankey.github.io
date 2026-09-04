@@ -45,7 +45,7 @@ const experiences: Experience[] = [
         achievements: [
           "주도적으로 반복 구현되던 UI 패턴을 분석하고, 디자인 시스템·Overlay·Storage 공통 플랫폼을 직접 설계·구축하여 상태 및 데이터 관리 규칙을 표준화 (팀 내 개발 생산성 개선)",
           "Popup 기반 Navigation의 한계를 먼저 발견하고 개선을 제안, 페이지 단위 라우팅 구조로 전환하며 History API 기반의 브라우저 탐색 경험을 안정적으로 지원하도록 개선",
-          "수백 건 카드 렌더링 시 발생하던 메모리 누수 문제를 데이터 기반으로 진단, Viewport Rendering과 TanStack Virtual 가상 스크롤을 도입하여 DOM 노드 98%, 메모리 사용량 83% 감소라는 성과 달성",
+          "수백 건 카드 렌더링 시 발생하던 메모리 누수 문제를 데이터 기반으로 진단, Viewport Rendering과 TanStack Virtual 가상 스크롤을 도입하여 DOM 노드 41,799 → 6,733 (84%), JS Heap 715MB → 149MB (79%), 이벤트 리스너 7,754 → 2,477 (68%) 감소",
           "분산되어 있던 로깅 방식의 비일관성을 문제로 정의하고, 선언적 Tracking Pipeline을 설계하여 Typed Schema·Sentry·Batch/Retry·sendBeacon 도입, 로그 품질과 운영 안정성 향상",
           "디자인팀과 긴밀히 협업하여 Figma Design Token 기반 디자인 시스템 도입을 리드, 팀 내 약 20개 공용 컴포넌트 개발 및 개발 기준 정립을 주도하고 신규 개발자 온보딩 가이드라인까지 마련",
         ],
@@ -55,8 +55,8 @@ const experiences: Experience[] = [
         period: "2023.03 - 2026.08",
         achievements: [
           "업무·업종 키워드 시스템: 자연어 입력 방식의 한계(구조화 부재로 매칭·분류 어려움)를 발견하고 구조화된 키워드 트리 도입을 제안, 기획을 총괄하고 DB 구조 설계에 기여. 사장님 구인글 등록, 알바 회원 추천, 일감 추천 알고리즘 등 서비스 전반의 기준 데이터로 활용되도록 구축",
-          "급여 지급 시스템 내재화: 파견 서비스 특성상 임금이 영업이익에 반영되지 않던 구조를 내재화하여 영업이익으로 인식되도록 전환, 정산 로직과 UI 개발에 직접 참여 (관련 기간 일간 영업이익 40% 증가)",
-          "구인글 등록 프로세스 개선 (2023.12 - 2024.01): 단일 폼으로 되어있던 등록 플로우를 단계별로 분리해 특히 고연령대 사용자의 사용성을 개선, 등록률 약 10% 증가",
+          "급여 지급 시스템 내재화: 파견 서비스 특성상 임금이 영업이익에 반영되지 않던 구조를 내재화하여 영업이익으로 인식되도록 전환, 정산 로직과 UI 개발에 직접 참여",
+          "구인글 등록 프로세스 개선 (2023.12 - 2024.01): 단일 폼으로 되어있던 등록 플로우를 단계별로 분리해 특히 고연령대 사용자의 사용성을 개선",
           "채팅 시스템 내재화 사전 검증 (2025.11 - 2025.12): 외부 채팅 SaaS에서 자체 WebSocket 시스템으로 전환하기 위한 사전 검증 담당. 기존 벤더 API 호출 지점에 자체 게이트웨이 호출을 병행 적용해 실트래픽 기반으로 검증 및 이관 규모 산정. 사내 realtime SDK 모노레포 패키지 편입, 연결 상태 관리 및 구형 기기 검증 등 주도",
         ],
       },
@@ -82,8 +82,8 @@ const experiences: Experience[] = [
         title: "CU 제휴 채용 서비스 페이지",
         period: "2022.03 - 2022.04",
         achievements: [
-          "CU(BGF리테일)와 급구 제휴로 단기~3개월 알바 채용에 특화된 서비스를 1개월 내 직접 개발",
-          "출시 이후 3년간 지속 운영되며 누적 신청 334건, 평균 매칭률 56% 기록",
+          "CU(BGF리테일)와 급구 제휴로 단기~3개월 알바 채용에 특화된 서비스를 1개월 내 단독 개발",
+          "출시 이후 3년간 지속 운영",
         ],
       },
     ],
@@ -97,16 +97,32 @@ interface SkillGroup {
 
 const skills: SkillGroup[] = [
   {
-    category: "Languages",
-    items: ["JavaScript", "TypeScript"],
+    category: "Language",
+    items: ["TypeScript", "JavaScript"],
   },
   {
-    category: "Frameworks",
-    items: ["React", "Vue.js", "Next.js"],
+    category: "Framework",
+    items: ["React", "Next.js (App Router)", "Vue 2", "Nuxt 2"],
   },
   {
-    category: "Libraries",
-    items: ["Zustand"],
+    category: "상태 / 데이터",
+    items: ["Zustand", "TanStack Query"],
+  },
+  {
+    category: "스타일 / 디자인",
+    items: ["Tailwind CSS v4", "Figma Design Tokens", "Design System"],
+  },
+  {
+    category: "성능 / 관측성",
+    items: ["TanStack Virtual", "Sentry", "sendBeacon", "Tracking Pipeline"],
+  },
+  {
+    category: "테스트",
+    items: ["Jest", "Testing Library", "MSW"],
+  },
+  {
+    category: "빌드 / 인프라",
+    items: ["pnpm 모노레포", "GitHub Actions", "Notion API"],
   },
 ];
 
