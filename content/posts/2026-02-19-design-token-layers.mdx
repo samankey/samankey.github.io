@@ -1,0 +1,155 @@
+---
+title: "디자인 토큰을 3계층으로 나눈 이유"
+date: "2026-02-19"
+summary: "원시 팔레트를 컴포넌트가 직접 참조하면 라이트/다크 분기가 컴포넌트마다 흩어진다. 계층을 두고 테마 전환을 레이어의 책임으로 옮긴 기록."
+tags: ["design-system", "tailwind", "css"]
+---
+
+리뉴얼을 시작할 때 디자인 시스템이라 할 것이 없었다. 쓰던 컬러 몇 개가 전부였다. 기존 체계와 공존시키는 작업이 아니라 처음부터 세우는 작업이었고, 그래서 계층 구조를 먼저 정할 수 있었다.
+
+## 컴포넌트가 원시 팔레트를 직접 부르면
+
+가장 얕은 구조는 컴포넌트가 팔레트를 바로 참조하는 것이다. `bg-gray-900` 같은 식이다. 계층이 없으니 이해가 빠르고 도입도 빠르다.
+
+문제는 라이트/다크가 생길 때다.
+
+```tsx
+<div className="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-50" />
+```
+
+이런 분기가 컴포넌트마다 붙는다. 그리고 "다크 모드의 본문 텍스트 색을 한 톤 밝게"라는 요청이 오면 `dark:text-gray-50`을 쓰는 곳을 전부 찾아야 한다. 찾아서 다 고쳤는지는 확인할 방법이 없다.
+
+값을 한 곳에서 바꾸려면 이름이 값이 아니라 **역할**을 가리켜야 한다.
+
+## 세 계층과 그 기준
+
+```text
+primitive  →  semantic  →  component
+원시 팔레트     역할 이름      컴포넌트별 용도
+```
+
+- **primitive** — 원시 팔레트. `blue-500` 같은 이름. 색 자체다
+- **semantic** — 역할 이름. `text-level1`, `border-basic`. "본문에서 가장 강한 텍스트"가 어느 색인지를 여기서 정한다
+- **component** — 컴포넌트별 용도. `button-surface-primary-main-on`. 버튼 주요 액션의 기본 배경
+
+계층을 몇 개 둘지의 기준은 개수가 아니라 **무엇이 테마에 따라 바뀌는가**였다.
+
+원시 팔레트는 테마와 무관하다. `blue-500`은 라이트에서도 다크에서도 같은 색이다. 바뀌는 것은 "본문 텍스트가 어느 색인가"이고, 그건 semantic 이하의 이야기다. 그래서 파일이 이렇게 갈린다.
+
+| 파일 | 벌 수 |
+| --- | --- |
+| `primitives.json` | 한 벌 |
+| `semantic.light.json` / `semantic.dark.json` | 두 벌 |
+| `component.light.json` / `component.dark.json` | 두 벌 |
+| `shadow.light.json` / `shadow.dark.json` | 두 벌 |
+| `typography.json` `spacing.json` `radius.json` `border.json` | 한 벌 |
+
+간격·radius·타이포는 테마에 따라 바뀌지 않으니 한 벌이다. 이 표가 곧 "무엇이 테마의 함수인가"에 대한 답이다.
+
+컴포넌트는 `text-level1`처럼 역할만 부르고, 그것이 라이트에서 어느 색이고 다크에서 어느 색인지는 알지 못한다. **테마 전환이 컴포넌트의 관심사에서 레이어의 책임으로 옮겨간다.**
+
+## 버린 대안
+
+**기존 UI 라이브러리의 토큰 체계를 가져오는 것.** 검증된 네이밍을 그대로 쓸 수 있어서 매력적이었다. 버린 이유는 원본이 Figma Variables라는 것이었다. 이름을 디자인팀의 컬렉션과 맞춰야 하는데, 외부 네이밍을 들이면 Figma와 코드가 서로 다른 어휘를 쓰게 된다. 시안의 이름을 코드의 이름으로 번역하는 단계가 매번 생긴다.
+
+**Style Dictionary 같은 토큰 빌드 도구.** 검증된 파이프라인이지만 산출물이 Tailwind v4용 `--color-*` 한 벌이라 변환 계층이 과했다. 그리고 정작 필요했던 사용처 검사는 어차피 직접 만들어야 했다.
+
+## 산출물은 손으로 고치지 않는다
+
+Figma Variables를 DTCG JSON으로 내보낸 파일이 **유일한 입력**이다. `theme.css`, `shadow.css`, 그리고 Storybook에서 쓰는 `color-tokens.json`은 전부 거기서 생성된다.
+
+```text
+tokens/*.json  →  generate-theme  →  theme.css · shadow.css · color-tokens.json
+```
+
+이 구조에서 제일 쉽게 무너지는 지점은 급할 때 `theme.css`를 직접 고치는 것이다. 그러면 원본과 산출물이 어긋나고, 다음 생성에서 조용히 덮어써진다.
+
+그래서 산출물이 토큰과 일치하는지 검사하는 스크립트를 두고 CI에서 돌린다. 작업 트리는 건드리지 않고 비교만 한다. 손으로 고치면 여기서 막힌다.
+
+## variant는 boolean을 늘리지 않는다
+
+토큰을 정리하고 나면 그걸 소비하는 공용 컴포넌트를 만들게 된다. 여기서 흔한 실수가 boolean prop을 늘리는 것이다.
+
+```tsx
+// 이렇게 하지 않았다
+<Button isPrimary isSmall isGhost />
+```
+
+이 방식은 **불가능한 조합이 타입상 가능해진다.** `isPrimary`와 `isGhost`를 같이 넘기면 무슨 버튼인가. 답이 없는데 타입은 통과한다.
+
+대신 직교하는 축으로 나눴다.
+
+```ts
+const buttonVariants = cva(base, {
+  variants: {
+    theme: { main: "…", sub: "…", ghost: "…" },
+    color: { primary: "", gray: "", red: "" },
+    size: {
+      lg: "h-52 rounded-16 px-14 typo-medium-m",
+      md: "h-44 rounded-12 px-14 typo-medium-m",
+      sm: "h-34 rounded-8 px-12 typo-bold-s",
+      tiny: "h-30 rounded-6 px-8 typo-bold-s",
+    },
+    radius: { square: "", round: "rounded-320" },
+  },
+  // ...
+});
+```
+
+`theme` × `color` × `size` × `radius`다. 각 축에서 하나씩 고르므로 모순되는 조합이 애초에 표현되지 않는다.
+
+`color`의 값들이 빈 문자열인 게 눈에 띌 것이다. 색은 `theme`과의 조합에서만 결정되기 때문이다. 같은 `red`라도 `main`이면 배경이 빨갛고 `sub`면 테두리가 빨갛다. 그런 것은 compound variant로 따로 적는다.
+
+```ts
+compoundVariants: [
+  {
+    theme: "main",
+    color: "primary",
+    className: cn(
+      "bg-button-surface-primary-main-on text-button-text-only-white",
+      "disabled:bg-button-surface-primary-main-off disabled:text-button-text-white-off",
+    ),
+  },
+  // ...
+]
+```
+
+이 구조의 실질적인 이점은 **디자이너와 같은 말을 쓰게 된다**는 것이었다. 시안에 "Sub / Red / Small"이라고 적혀 있으면 코드가 `theme="sub" color="red" size="sm"`이다. 번역이 없다.
+
+새 조합 요청이 오면 먼저 **축 위의 한 칸인지** 확인한다. 축 안이면 compound variant 한 줄이고, 축 밖이면 별도 컴포넌트로 논의한다. 축은 곱해지지만 컴포넌트는 늘지 않는다.
+
+## 시안이 토큰을 벗어날 때
+
+버튼 눌림 오버레이에서 이 문제를 만났다. 시안은 Hover 50%, Press 100%를 요구했는데 오버레이 토큰은 검정 15% 한 값만 갖고 있었다.
+
+새 토큰을 두 개 만들 수도 있었다. 대신 **있는 토큰의 의미를 다시 읽는 쪽**을 택했다. 토큰이 이미 15%를 담고 있으니, 불투명도를 강도 축으로 쓰면 새 토큰 없이 시안이 만족된다.
+
+```ts
+cn(
+  "relative overflow-hidden",
+  "after:pointer-events-none after:absolute after:inset-0",
+  "after:bg-button-pressed-black",
+  // 토큰이 이미 15%라 opacity가 강도를 정한다 (시안: Hovered 50%, Pressed 100%)
+  "after:opacity-0 hover:after:opacity-50 active:after:opacity-100",
+  "after:transition-opacity after:duration-100",
+)
+```
+
+토큰을 늘리기 전에 있는 것으로 표현되는지 먼저 본다. 토큰이 늘어나면 Figma와 코드 양쪽에 이름이 하나씩 늘고, 그 이름이 정확히 무엇인지 아는 사람도 줄어든다.
+
+## 무엇을 공용으로 올릴지
+
+컴포넌트를 카테고리로 먼저 나눴다. 의존성 없는 순수 블록은 `core`, 흐름을 가리고 위로 뜨는 것은 `overlays`, 입력은 `forms` 같은 식이다. 그리고 **새로 만들 때 어느 카테고리에 속하는지 답할 수 있는가**를 공용화 조건으로 삼았다. 답이 애매하면 아직 아니라고 봤다.
+
+시각적으로 비슷해도 의미가 다르면 나눴다. `badge`와 `chip`은 둘 다 작은 라운드 라벨이지만 badge는 상태 표시고 chip은 선택 가능한 입력이다. 합치면 variant가 아니라 **동작이 갈리는 prop**이 생긴다. `clickable` 같은 것이 붙는 순간 그건 두 컴포넌트다.
+
+반대로 내부 엔진은 공용 API에서 뺐다. 버튼의 레이아웃과 포커스 링만 담당하는 `button-base`는 `index.ts`에서 export하지 않는다. 폴더 안에 메인·파생형·내부 엔진·테스트·스토리를 모아 두고 `index.ts`로만 노출하면, 밖에서 쓸 수 있는 것과 안에서만 쓰는 것이 한 파일에 적힌다.
+
+## 정리
+
+- 계층을 몇 개 둘지는 **무엇이 테마에 따라 바뀌는가**로 갈랐다. 원시 팔레트는 한 벌, semantic·component만 라이트/다크 두 벌
+- 컴포넌트가 역할 이름만 부르면 테마 전환이 컴포넌트의 관심사에서 빠진다
+- 토큰 원본은 Figma에서 내보낸 JSON 하나다. `theme.css` 이하는 산출물이라 손으로 고치면 CI가 막는다
+- variant는 boolean을 늘리지 않고 **직교하는 축**으로 나눈다. 불가능한 조합이 타입상 표현되지 않고, 시안의 어휘와 그대로 대응된다
+- 시안이 토큰을 벗어나면 토큰을 늘리기 전에 **있는 토큰의 의미를 다시 읽는다**
+- 시각적으로 닮아도 동작이 갈리면 나눈다. `clickable` 같은 prop이 붙는 순간 두 컴포넌트다
