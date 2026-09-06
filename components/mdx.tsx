@@ -117,8 +117,9 @@ function Anchor({ href = "", className: incoming, ...props }: ComponentPropsWith
     );
   }
 
+  // 밑줄은 평소 회색으로 물러나 있다가 hover 에서만 포인트 컬러로 올라온다.
   const className =
-    "underline decoration-zinc-300 decoration-1 underline-offset-[3px] transition-colors duration-200 hover:decoration-zinc-900 dark:decoration-zinc-600 dark:hover:decoration-zinc-100";
+    "underline decoration-zinc-300 decoration-1 underline-offset-[3px] transition-colors duration-200 hover:decoration-accent dark:decoration-zinc-600 dark:hover:decoration-accent";
 
   if (href.startsWith("/")) {
     return <Link href={href} className={className} {...props} />;

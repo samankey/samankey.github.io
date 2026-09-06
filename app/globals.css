@@ -13,6 +13,11 @@
 @theme {
   --font-sans: var(--font-geist-sans), var(--font-pretendard), sans-serif;
   --font-mono: var(--font-geist-mono), var(--font-pretendard), monospace;
+
+  /* 포인트 컬러. 다크에서 쓰는 #d5ff97 은 흰 배경 대비가 1.13:1 이라 라이트에서
+     그대로 쓰면 보이지 않는다. 같은 색상(84°)을 어둡게 잡아 흰 배경 4.99:1 을
+     맞춘 값이 기본이고, 다크에서만 아래에서 원래 값으로 되돌린다. */
+  --color-accent: #4d7c0f;
 }
 
 html {
@@ -23,6 +28,7 @@ html {
 
 html.dark {
   color-scheme: dark;
+  --color-accent: #d5ff97;
 }
 
 body {
@@ -31,13 +37,13 @@ body {
 }
 
 ::selection {
-  background-color: var(--color-zinc-900);
+  background-color: var(--color-accent);
   color: var(--color-white);
 }
 
 .dark ::selection {
-  background-color: var(--color-zinc-100);
-  color: var(--color-zinc-900);
+  background-color: var(--color-accent);
+  color: var(--color-zinc-950);
 }
 
 /* ---------------------------------------------------------------- *
@@ -130,14 +136,15 @@ body {
   padding-inline: 1.125rem;
 }
 
+/* 강조 줄의 왼쪽 마커만 포인트 컬러를 쓴다. 배경까지 물들이면 코드가 읽히지 않는다. */
 .post-body pre.shiki .line.highlighted {
   background-color: var(--color-zinc-200);
-  box-shadow: inset 2px 0 0 var(--color-zinc-400);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .dark .post-body pre.shiki .line.highlighted {
   background-color: var(--color-zinc-800);
-  box-shadow: inset 2px 0 0 var(--color-zinc-600);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .post-body pre.shiki span {
