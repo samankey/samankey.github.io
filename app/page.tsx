@@ -1,17 +1,10 @@
 import { PostList } from "@/components/post-list";
 import { getPostsByYear } from "@/lib/posts";
-import { site } from "@/lib/site";
 
+/**
+ * 홈은 글 목록으로 바로 들어간다. `site.description` 은 about/resume 과 겹치는
+ * 소개라 화면에서는 빼고, 메타데이터·RSS·OG 이미지에서만 계속 쓴다.
+ */
 export default function HomePage() {
-  const groups = getPostsByYear();
-
-  return (
-    <div>
-      <p className="mb-16 max-w-[34rem] text-[15px] leading-[1.8] text-zinc-500 sm:mb-20 dark:text-zinc-400">
-        {site.description}
-      </p>
-
-      <PostList groups={groups} />
-    </div>
-  );
+  return <PostList groups={getPostsByYear()} />;
 }
